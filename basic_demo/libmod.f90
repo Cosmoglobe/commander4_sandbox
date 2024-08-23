@@ -69,7 +69,7 @@ subroutine compsep_compute_rhs(rhs, l_rhs) bind(c, name="compsep_compute_rhs")
   
 end subroutine compsep_compute_rhs
 
-subroutine compsep_compute_Ax(x, l_x) bind(c, name="compsep_compute_Ax")
+subroutine compsep_compute_Ax(x, l_x) bind(c, name="compsep_compute_ax")
   use compsep
   use iso_c_binding
   implicit none
