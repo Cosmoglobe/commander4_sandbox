@@ -3,7 +3,7 @@ program main
   use compsep
   implicit none
 
-  integer(c_int64_t) :: nband, nside, lmax, i, l_x
+  integer(c_int64_t) :: nband, nside, lmax, i
   real(c_double)     :: fwhm
 
   real(c_double), allocatable  :: rhs(:), x(:)
@@ -27,7 +27,6 @@ program main
 
   ! Solve for best-fit map by CG
   allocate(x(0:12*nside**2-1))
-  l_x = size(x)
-  call compsep_compute_Ax(x, l_x)
+  call compsep_compute_Ax(x, size(x))
 
 end program main
