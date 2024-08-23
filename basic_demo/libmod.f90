@@ -72,4 +72,3 @@ subroutine compsep_compute_Ax(i, x) bind(c, name="compsep_compute_Ax")
   
 end subroutine compsep_compute_Ax
 
-end module compsep
