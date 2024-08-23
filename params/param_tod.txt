@@ -1,0 +1,36 @@
+# Commander4 Compsep parameter file
+
+NUM_GIBBS_ITER     = 100
+BASE_SEED          = 1231441
+CHAIN_MODE         = gibbs    # {gibbs,standalone}
+
+DATA_DIRECTORY     = /mn/stornext/d23/cmbco/cg/dirbe/data
+OUTPUT_DIRECTORY   = chains_prod_c1
+
+# List of included data sets
+NUMBAND         = 2
+INCLUDE_BAND001 = .true. # freq1
+INCLUDE_BAND002 = .true. # freq2
+
+@START 001
+BAND_LABEL&&&                  = freq1
+BAND_LABEL&&&                  = freq1
+BAND_INIT_SIGNAL_MODEL&&&      = init_cmb.fits
+BAND_NSIDE&&&                  = 2048
+BAND_LMAX&&&                   = 6000
+BAND_BEAM_FWHM&&&              = 10
+BAND_TOD_DETECTOR_LIST&&&      = freq1_01
+BAND_TOD_FILELIST&&&           = tod_freq1.h5
+@END 001
+
+@START 002
+BAND_LABEL&&&                  = freq2
+BAND_LABEL&&&                  = freq2
+BAND_INIT_SIGNAL_MODEL&&&      = init_cmb.fits
+BAND_NSIDE&&&                  = 2048
+BAND_LMAX&&&                   = 6000
+BAND_BEAM_FWHM&&&              = 10
+BAND_TOD_DETECTOR_LIST&&&      = freq2_01
+BAND_TOD_FILELIST&&&           = tod_freq2.h5
+@END 002
+

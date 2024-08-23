@@ -1,0 +1,49 @@
+# Commander4 Compsep parameter file
+
+NUM_GIBBS_ITER     = 100
+BASE_SEED          = 12314
+CHAIN_MODE         = gibbs    # {gibbs,standalone}
+
+DATA_DIRECTORY     = /mn/stornext/d23/cmbco/cg/dirbe/data
+OUTPUT_DIRECTORY   = chains_prod_c1
+
+# List of included data sets
+NUMBAND         = 2
+INCLUDE_BAND001 = .true. # freq1
+INCLUDE_BAND002 = .true. # freq2
+
+@START 001
+BAND_LABEL&&&                  = 01
+BAND_LABEL&&&                  = freq1
+BAND_MAPFILE&&&                = freq1_map.fits
+BAND_NOISEFILE&&&              = freq1_rms.fits
+BAND_NSIDE&&&                  = 2048
+BAND_LMAX&&&                   = 6000
+BAND_BEAM_FWHM&&&              = 10
+@END 001
+
+@START 002
+BAND_LABEL&&&                  = 01
+BAND_LABEL&&&                  = freq1
+BAND_MAPFILE&&&                = freq1_map.fits
+BAND_NOISEFILE&&&              = freq1_rms.fits
+BAND_NSIDE&&&                  = 2048
+BAND_LMAX&&&                   = 6000
+BAND_BEAM_FWHM&&&              = 10
+@END 002
+
+
+# List of included commponents
+NUMCOMP         = 1
+INCLUDE_COMP001 = .true.   # CMB
+
+# CMB component
+@START 01
+COMP_LABEL&&                  = cmb
+COMP_TYPE&&                   = cmb
+COMP_NSIDE&&                  = 2048
+COMP_AMP_LMIN&&               = 0
+COMP_AMP_LMAX&&               = 6000
+COMP_AMP_INPUT_MAP&&          = init_cmb.fits
+COMP_OUTPUT_FWHM&&            = 10              # arcmin
+@END 01
