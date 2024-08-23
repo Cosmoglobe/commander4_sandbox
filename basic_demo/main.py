@@ -6,24 +6,21 @@ import ctypes as ct
 
 # open the shared library in question
 fortlib = ct.CDLL('demo_lib.so')
-# define the argument types of the function
-fortlib.demo_sub.argtypes = [ct.POINTER(ct.c_double), ct.c_int64, ct.c_int64]
-# define the argument types of the function
-fortlib.set_mod_arr.argtypes = [ct.POINTER(ct.c_double), ct.c_int64, ct.c_int64]
-# define the argument types of the function
-fortlib.get_mod_arr.argtypes = [ct.POINTER(ct.c_double), ct.c_int64, ct.c_int64]
+fortlib.compsep_init.argtypes = [ct.c_int64]
 
-# demo array to call the function with
-arr = np.zeros((2,3), order="F")
+fortlib.compsep_init_band.argtypes = [ct.c_int64, ct.POINTER(ct.c_char), ct.c_int64, ct.c_int64, ct.c_double, ct.c_int64]
 
-# call the function; it should print a few things
-fortlib.demo_sub(arr.ctypes.data_as(ct.POINTER(ct.c_double)), arr.shape[0], arr.shape[1])
+fortlib.compsep_compute_rhs.argtypes = [ct.c_int64, ct.POINTER(ct.c_double), ct.c_int64]
 
-fortlib.set_mod_arr(arr.ctypes.data_as(ct.POINTER(ct.c_double)), arr.shape[0], arr.shape[1])
+fortlib.compsep_compute_Ax.argtypes = [ct.c_int64, ct.POINTER(ct.c_double), ct.c_int64]
 
-arr[()]=42
+nband = 5
+nside = 256
+lmax = 512
+fwhm = 0.42
 
-fortlib.get_mod_arr(arr.ctypes.data_as(ct.POINTER(ct.c_double)), arr.shape[0], arr.shape[1])
+fortlib.compsep_init(nband)
 
-# demonstrate that the function actually changed the array contents
-print(arr)
+for i in range(nband):
+    name = b"test_str"
+    fortlib.compsep_init_band(i, name, nside, lmax, fwhm, len(name))

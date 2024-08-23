@@ -1,6 +1,8 @@
 module compsep
   use iso_c_binding
   implicit none
+
+  real(c_double) :: pi=3.141592653589793238462643383279502884197_c_double;
   
   type dataset
      character(len=512)  :: label
@@ -15,12 +17,13 @@ module compsep
   
 end module compsep
 
-subroutine compsep_init(numband) bind(c, name="init")
+subroutine compsep_init(numband_arg) bind(c, name="compsep_init")
   use compsep
   use iso_c_binding
   implicit none
-  integer(c_int64_t), intent(in) :: numband
-  
+  integer(c_int64_t), intent(in), value :: numband_arg
+  print *, "compsep_init called with ",numband_arg
+  numband = numband_arg
   allocate(data(numband))
   
 end subroutine compsep_init
@@ -29,10 +32,13 @@ subroutine compsep_init_band(i, label, nside, lmax, fwhm) bind(c, name="compsep_
   use compsep
   use iso_c_binding
   implicit none
+  integer(c_int64_t), intent(in), value :: i, nside, lmax
+  real(c_double), intent(in), value :: fwhm
   character(len=*),   intent(in) :: label
-  integer(c_int64_t), intent(in) :: numband
   
   integer(4) :: l
+
+  print *, "compsep_init_band called with ",i, label, nside, lmax, fwhm
   
   data(i)%label = label
   data(i)%nside = nside
@@ -50,11 +56,11 @@ subroutine compsep_init_band(i, label, nside, lmax, fwhm) bind(c, name="compsep_
   
 end subroutine compsep_init_band
 
-subroutine compsep_compute_rhs(i, rhs) bind(c, name="compsep_init_band")
+subroutine compsep_compute_rhs(i, rhs) bind(c, name="compsep_compute_rhs")
   use compsep
   use iso_c_binding
   implicit none
-  integer(c_int64_t),               intent(in)  :: i
+  integer(c_int64_t),               intent(in), value  :: i
   real(c_double),     dimension(:), intent(out) :: rhs
   
   rhs = data(i)%map / data(i)%rms**2
@@ -65,7 +71,7 @@ subroutine compsep_compute_Ax(i, x) bind(c, name="compsep_compute_Ax")
   use compsep
   use iso_c_binding
   implicit none
-  integer(c_int64_t),               intent(in)    :: i
+  integer(c_int64_t),               intent(in), value    :: i
   real(c_double),     dimension(:), intent(inout) :: x
   
   x = x / data(i)%rms**2
