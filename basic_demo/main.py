@@ -5,14 +5,11 @@ import ctypes as ct
 # the "end user" later on
 
 # open the shared library in question
-fortlib = ct.CDLL('demo_lib.so')
+fortlib = ct.CDLL('libcommander.so')
 fortlib.compsep_init.argtypes = [ct.c_int64]
-
 fortlib.compsep_init_band.argtypes = [ct.c_int64, ct.c_int64, ct.c_int64, ct.c_double]
-
 fortlib.compsep_compute_rhs.argtypes = [ct.POINTER(ct.c_double), ct.c_int64]
-
-fortlib.compsep_compute_Ax.argtypes = [ct.POINTER(ct.c_double), ct.c_int64]
+fortlib.compsep_compute_ax.argtypes = [ct.POINTER(ct.c_double), ct.c_int64]
 
 nband = 5
 nside = 256
@@ -32,4 +29,4 @@ fortlib.compsep_compute_rhs(rhs.ctypes.data_as(ct.POINTER(ct.c_double)), rhs.sha
 
 # Solve for best-fit map by CG
 x = np.empty(12*nside**2)
-fortlib.compsep_compute_Ax(x.ctypes.data_as(ct.POINTER(ct.c_double)), x.shape[0])
+fortlib.compsep_compute_ax(x.ctypes.data_as(ct.POINTER(ct.c_double)), x.shape[0])

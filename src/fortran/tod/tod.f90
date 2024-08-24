@@ -1,4 +1,4 @@
-module compsep
+module todmod
   use healpix_types
   implicit none
 
@@ -14,8 +14,8 @@ module compsep
      integer(i4b)       :: nscan
      integer(i4b)       :: nside
      type(scan), allocatable, dimension(:) :: scans    ! Array of all scans
-  end type comm_tod
-
+  end type tod
+  
 contains
 
-end module compsep
+end module todmod
