@@ -20,7 +20,7 @@ subroutine compsep_init(numband_arg) bind(c, name="compsep_init")
   use compsep
   use iso_c_binding
   implicit none
-  integer(c_int64_t), intent(in), value :: numband_arg
+  integer(c_int64_t), intent(in) :: numband_arg
   print *, "compsep_init called with ",numband_arg
   numband = numband_arg
   allocate(data(numband))
@@ -31,8 +31,8 @@ subroutine compsep_init_band(i, nside, lmax, fwhm) bind(c, name="compsep_init_ba
   use compsep
   use iso_c_binding
   implicit none
-  integer(c_int64_t), intent(in), value :: i, nside, lmax
-  real(c_double),     intent(in), value :: fwhm
+  integer(c_int64_t), intent(in) :: i, nside, lmax
+  real(c_double),     intent(in) :: fwhm
   
   integer(4) :: l
 
@@ -57,7 +57,7 @@ subroutine compsep_compute_rhs(rhs, l_rhs) bind(c, name="compsep_compute_rhs")
   use compsep
   use iso_c_binding
   implicit none
-  integer(c_int64_t), intent(in), value  :: l_rhs
+  integer(c_int64_t), intent(in)  :: l_rhs
   real(c_double),     intent(out)        :: rhs(l_rhs)
 
   integer(4) :: i
@@ -69,11 +69,11 @@ subroutine compsep_compute_rhs(rhs, l_rhs) bind(c, name="compsep_compute_rhs")
   
 end subroutine compsep_compute_rhs
 
-subroutine compsep_compute_Ax(x, l_x) bind(c, name="compsep_compute_ax")
+subroutine compsep_compute_ax(x, l_x) bind(c, name="compsep_compute_ax")
   use compsep
   use iso_c_binding
   implicit none
-  integer(c_int64_t),  intent(in),   value :: l_x
+  integer(c_int64_t),  intent(in) :: l_x
   real(c_double),      intent(inout)       :: x(l_x)
 
   integer(4) :: i

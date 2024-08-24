@@ -23,10 +23,10 @@ program main
   
   ! Compute RHS of mapmaking equation
   allocate(rhs(0:12*nside**2-1))
-  call compsep_compute_rhs(rhs, size(rhs))
+  call compsep_compute_rhs(rhs, int(size(rhs), c_int64_t))
 
   ! Solve for best-fit map by CG
   allocate(x(0:12*nside**2-1))
-  call compsep_compute_Ax(x, size(x))
+  call compsep_compute_ax(x, int(size(x), c_int64_t))
 
 end program main
