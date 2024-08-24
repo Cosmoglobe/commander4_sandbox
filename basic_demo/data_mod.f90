@@ -26,13 +26,10 @@ module data_mod
   
   integer(c_int64_t) :: numband
   type(dataset_class), allocatable, dimension(:) :: data
-  
-end module data_mod
 
-subroutine data_init(numband_arg) bind(c, name="data_init")
-  use data_mod
-  use iso_c_binding
-  implicit none
+contains
+
+subroutine data_init(numband_arg)
   integer(c_int64_t), intent(in) :: numband_arg
   print *, "data_init called with ",numband_arg
   numband = numband_arg
@@ -40,10 +37,8 @@ subroutine data_init(numband_arg) bind(c, name="data_init")
   
 end subroutine data_init
 
-subroutine data_init_band(i, nside, lmax, fwhm) bind(c, name="data_init_band")
-  use data_mod
+subroutine data_init_band(i, nside, lmax, fwhm)
   use iso_c_binding
-  implicit none
   integer(c_int64_t), intent(in) :: i, nside, lmax
   real(c_double),     intent(in) :: fwhm
   
@@ -65,3 +60,26 @@ subroutine data_init_band(i, nside, lmax, fwhm) bind(c, name="data_init_band")
   end do
   
 end subroutine data_init_band
+
+end module data_mod
+
+! foreign language interface routines ... simple forwarders to module members
+
+subroutine data_init_ifc(numband_arg) bind(c, name="data_init_ifc")
+  use data_mod
+  use iso_c_binding
+  implicit none
+  integer(c_int64_t), intent(in) :: numband_arg
+  print *, "data_init_ifc called with ",numband_arg
+  call data_init(numband_arg)  
+end subroutine data_init_ifc
+
+subroutine data_init_band_ifc(i, nside, lmax, fwhm) bind(c, name="data_init_band_ifc")
+  use data_mod
+  use iso_c_binding
+  implicit none
+  integer(c_int64_t), intent(in) :: i, nside, lmax
+  real(c_double),     intent(in) :: fwhm
+  
+  call data_init_band(i, nside, lmax, fwhm)
+end subroutine data_init_band_ifc
