@@ -38,7 +38,7 @@ program main
            d(k)   = mod(k,4) + 0.6d0
            pix(k) = mod(k,npix)
         end do
-        call tod_init_scan(i, j, ntod, d, pix)
+        call tod_init_scan(i, j, d, pix)
         deallocate(d,pix)
      end do
   end do  
@@ -55,11 +55,11 @@ program main
      
      ! Compute RHS of mapmaking equation
      allocate(rhs(0:12*nside**2-1))
-     call compsep_compute_rhs(rhs, int(size(rhs), c_int64_t))
+     call compsep_compute_rhs(rhs)
      
      ! Solve for best-fit map by CG
      allocate(signal(0:12*nside**2-1))
-     call compsep_compute_Ax(signal, int(size(signal), c_int64_t))
+     call compsep_compute_Ax(signal)
      
      ! **********************
      ! TOD stage
@@ -67,8 +67,8 @@ program main
 
      ! Estimate white noise rms per scan
      do i = 1, nband
-        do j = 1, data(i)%tod%nscan
-           call tod_estimate_sigma0(i, j, signal, int(size(signal), c_int64_t))
+        do j = 1, size(data(i)%tod%scans,1)
+           call tod_estimate_sigma0(i, j, signal)
         end do
      end do
 

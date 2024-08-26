@@ -1,5 +1,5 @@
 # Fortran driver
-gfortran data_mod.f90 compsep.f90 tod.f90 main.f90 -fbacktrace -O0 -C -fPIC -o main -g
+gfortran data_mod.f90 compsep.f90 tod.f90 main.f90 -fbacktrace -O0 -o main -g
 ./main
 
 # Python driver
