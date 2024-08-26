@@ -11,9 +11,8 @@ subroutine compsep_compute_rhs(rhs)
   integer :: i
 
   rhs = 0.d0
-! FIXME: this can't be right... rhs is overwritten in every iteration
   do i = 1, size(data,1)
-     rhs = data(i)%map / data(i)%rms**2
+     rhs = rhs + data(i)%map / data(i)%rms**2
   end do
 end subroutine compsep_compute_rhs
 
