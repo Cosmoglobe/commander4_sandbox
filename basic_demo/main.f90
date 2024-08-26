@@ -8,7 +8,7 @@ program main
   integer(c_int64_t) :: nband, nside, npix, lmax, i, j, k, nscan, ntod, ngibbs, iter
   real(c_double)     :: fwhm
 
-  real(c_double),     allocatable  :: rhs(:), signal(:)
+  real(c_double),     allocatable  :: rhs(:), signal(:), m_map(:), m_rms(:)
   real(c_float),      allocatable  :: d(:)
   integer(c_int32_t), allocatable  :: pix(:)
 
@@ -74,7 +74,7 @@ program main
 
      ! Make frequency maps
      do i = 1, nband
-        call tod_mapmaker(i)
+        call tod_mapmaker(i, m_rms, m_map)
      end do
 
      ! Clean up

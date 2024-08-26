@@ -1,5 +1,6 @@
 import numpy as np
 import ctypes as ct
+import healpy as hp
 
 # NB Most of the ugly details of the function calls and will be hidden from
 # the "end user" later on
@@ -34,7 +35,7 @@ fortlib.compsep_compute_Ax_ifc.argtypes  = [a_f64_1, i64]
 fortlib.tod_init_band_ifc.argtypes       = [i64, i64]
 fortlib.tod_init_scan_ifc.argtypes       = [i64, i64, i64, a_f32_1, a_i32_1]
 fortlib.tod_estimate_sigma0_ifc.argtypes = [i64, i64, a_f64_1, i64]
-fortlib.tod_mapmaker_ifc.argtypes        = [i64]
+fortlib.tod_mapmaker_ifc.argtypes        = [i64, a_f64_1, a_f64_1]
 
 ngibbs = 10
 nband  = 5
@@ -44,6 +45,9 @@ nside  = 256
 npix   = 12*nside*nside
 lmax   = 512
 fwhm   = 0.42
+
+m_i   = np.zeros(12*nside**2, dtype=np.float64)
+rms_i = np.zeros(12*nside**2, dtype=np.float64)
 
 # Initialize basic data
 fortlib.data_init_ifc(nband)
@@ -89,4 +93,6 @@ for iter in range(ngibbs):
 
      # Make frequency maps
      for i in range(nband):
-        fortlib.tod_mapmaker_ifc(i+1)
+        fortlib.tod_mapmaker_ifc(i+1, m_i, rms_i)
+        hp.write_map(f'map_band_{i:02}_c{iter:06}.fits', m_i, overwrite=True)
+        hp.write_map(f'rms_band_{i:02}_c{iter:06}.fits', rms_i, overwrite=True)
