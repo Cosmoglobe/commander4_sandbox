@@ -35,19 +35,17 @@ fortlib.compsep_compute_Ax_ifc.argtypes  = [a_f64_1, i64]
 fortlib.tod_init_band_ifc.argtypes       = [i64, i64]
 fortlib.tod_init_scan_ifc.argtypes       = [i64, i64, i64, a_f32_1, a_i32_1]
 fortlib.tod_estimate_sigma0_ifc.argtypes = [i64, i64, a_f64_1, i64]
-fortlib.tod_mapmaker_ifc.argtypes        = [i64, a_f64_1, a_f64_1]
+fortlib.tod_mapmaker_ifc.argtypes        = [i64, a_f64_1, a_f64_1, i64]
 
-ngibbs = 10
+ngibbs = 5
 nband  = 5
 nscan  = 10
-ntod   = 1024
-nside  = 256
+ntod   = 2**16
+nside  = 64
 npix   = 12*nside*nside
 lmax   = 512
 fwhm   = 0.42
 
-m_i   = np.zeros(12*nside**2, dtype=np.float64)
-rms_i = np.zeros(12*nside**2, dtype=np.float64)
 
 # Initialize basic data
 fortlib.data_init_ifc(nband)
@@ -60,15 +58,15 @@ for i in range(nband):
     for j in range(nscan):
         d   = np.zeros(ntod, dtype=np.float32)
         pix = np.zeros(ntod, dtype=np.int32)
-        for k in range(ntod):
-            d[k]   = k%4 + 0.6
-            pix[k] = k%npix
+        for k in range(1, ntod+1):
+            d[k-1]   = k%4 + 0.6
+            pix[k-1] = k%npix
         fortlib.tod_init_scan_ifc(i+1, j+1, ntod, d, pix)
 
 # Run Gibbs sampler
-for iter in range(ngibbs):
+for iter in range(1,ngibbs+1):
 
-     print('Gibbs iter = '+str(iter)+' of '+str(ngibbs))
+     print(f'Gibbs iter = {iter} of {ngibbs}')
      
      # **********************
      # COMPSEP stage
@@ -93,6 +91,11 @@ for iter in range(ngibbs):
 
      # Make frequency maps
      for i in range(nband):
-        fortlib.tod_mapmaker_ifc(i+1, m_i, rms_i)
-        hp.write_map(f'map_band_{i:02}_c{iter:06}.fits', m_i, overwrite=True)
-        hp.write_map(f'rms_band_{i:02}_c{iter:06}.fits', rms_i, overwrite=True)
+        m_i   = np.zeros(12*nside**2, dtype=dbl)
+        rms_i = np.zeros(12*nside**2, dtype=dbl)
+        fortlib.tod_mapmaker_ifc(i+1, m_i, rms_i, npix)
+        #print(m_i)
+        hp.write_map(f'output/map_band_{i:02}_c{iter:06}.fits', m_i,
+                overwrite=True, dtype=dbl)
+        hp.write_map(f'output/rms_band_{i:02}_c{iter:06}.fits', rms_i,
+                overwrite=True, dtype=dbl)

@@ -52,20 +52,23 @@ subroutine tod_mapmaker(band, map_ifc, rms_ifc)
   use iso_c_binding
   implicit none
   integer(c_int64_t),  intent(in) :: band
-  real(c_double), intent(inout), dimension(:) :: map_ifc, rms_ifc
+  real(c_double), intent(inout), dimension(0:) :: map_ifc, rms_ifc
 
 
-  integer(4) :: i, pix
+  integer(8) :: i, j, scan, pix
   real(c_double), allocatable, dimension(:) :: A, b
 
   allocate(A(0:data(band)%npix-1), b(0:data(band)%npix-1))
   A = 0.d0
   b = 0.d0
   ! Collect contributions from all samples
-  do i = 1, size(data(band)%tod%scans,1)
-     pix    = data(band)%tod%scans(i)%pix(i)
-     A(pix) = A(pix) + 1.d0
-     b(pix) = b(pix) + data(band)%tod%scans(i)%d(pix)
+
+  do scan = 1, size(data(band)%tod%scans)
+     do j = 0, size(data(band)%tod%scans(scan)%pix) - 1
+       pix    = data(band)%tod%scans(scan)%pix(j)
+       A(pix) = A(pix) + 1.d0
+       b(pix) = b(pix) + data(band)%tod%scans(scan)%d(j)
+     end do
   end do
 
   ! Solve for map and rms
@@ -106,12 +109,13 @@ subroutine tod_estimate_sigma0_ifc(band, scan, signal, npix) bind(c, name="tod_e
   call tod_estimate_sigma0(band, scan, signal)
 end subroutine tod_estimate_sigma0_ifc
 
-subroutine tod_mapmaker_ifc(band, map_ifc, rms_ifc) bind(c, name="tod_mapmaker_ifc")
+subroutine tod_mapmaker_ifc(band, map_ifc, rms_ifc, npix) bind(c, name="tod_mapmaker_ifc")
   use tod_mod
   implicit none
-  integer(c_int64_t),  intent(in), value :: band
-  real(c_double), intent(inout), dimension(:) :: map_ifc
-  real(c_double), intent(inout), dimension(:) :: rms_ifc
+  integer(c_int64_t),  intent(in), value :: band, npix
+  real(c_double), intent(inout), dimension(0:npix-1) :: map_ifc
+  real(c_double), intent(inout), dimension(0:npix-1) :: rms_ifc
+
 
   call tod_mapmaker(band, map_ifc, rms_ifc)
 end subroutine tod_mapmaker_ifc

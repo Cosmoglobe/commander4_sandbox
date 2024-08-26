@@ -15,8 +15,8 @@ program main
   ngibbs = 5
   nband  = 5
   nscan  = 10
-  ntod   = 1024
-  nside  = 256
+  ntod   = 2**16
+  nside  = 64
   npix   = 12*nside**2
   lmax   = 512
   fwhm   = 0.42
