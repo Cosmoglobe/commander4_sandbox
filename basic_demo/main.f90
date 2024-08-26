@@ -13,10 +13,10 @@ program main
   integer(c_int32_t), allocatable  :: pix(:)
 
   ngibbs = 5
-  nband  = 5
-  nscan  = 10
-  ntod   = 2**16
-  nside  = 64
+  nband  = 1
+  nscan  = 108
+  ntod   = 2**22
+  nside  = 2048
   npix   = 12*nside**2
   lmax   = 512
   fwhm   = 0.42
@@ -74,7 +74,7 @@ program main
 
      ! Make frequency maps
      do i = 1, nband
-        call tod_mapmaker(i, m_rms, m_map)
+        call tod_mapmaker(i)
      end do
 
      ! Clean up

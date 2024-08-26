@@ -22,6 +22,7 @@ lmax = 6000
 fwhm = 10*u.arcmin
 sigma0 = 30
 freq = '90'
+freqs = [30, 70, 100, 217, 353]
 
 ell = np.arange(lmax+1)
 Cl = np.zeros(len(ell))
@@ -51,12 +52,12 @@ output_path = '.'
 version = 'hello'
 comm_tod = commander_tod(output_path, "", version, overwrite=True)
 
-hdf_filename = 'tod_example.h5'
+hdf_filename = 'tod_example'
 
 COMMON_GROUP = "/common"
 HUFFMAN_COMPRESSION = ["huffman", {"dictNum": 1}]
 
-comm_tod.init_file(freq=freq, od="", mode="w")
+comm_tod.init_file(freq=hdf_filename, od="", mode="w")
 #
 ## nside
 comm_tod.add_field(COMMON_GROUP + "/nside", [nside])
@@ -64,29 +65,31 @@ comm_tod.add_field(COMMON_GROUP + "/nside", [nside])
 for pid in range(n_chunks):
     pid_label = f'{pid+1:06}'
     pid_common_group = pid_label + "/common"
-    pid_data_group = f'{pid_label}/{freq}'
+    for freq in freqs:
+        pid_data_group = f'{pid_label}/{freq:03}'
 
-    comm_tod.add_field(pid_common_group + "/ntod", [2**22])
+        comm_tod.add_field(pid_common_group + "/ntod", [2**22])
 
 
-    tod_chunk_i =   d[pid*2**22 : (pid+1)*2**22]
-    pix_chunk_i = pix[pid*2**22 : (pid+1)*2**22]
-    comm_tod.add_field(pid_data_group + "/tod", tod_chunk_i)
-    comm_tod.add_field(pid_data_group + "/pix", pix_chunk_i)
-    comm_tod.finalize_chunk(pid)
+        tod_chunk_i =   d[pid*2**22 : (pid+1)*2**22]
+        pix_chunk_i = pix[pid*2**22 : (pid+1)*2**22]
+        comm_tod.add_field(pid_data_group + "/tod", tod_chunk_i)
+        comm_tod.add_field(pid_data_group + "/pix", pix_chunk_i)
+    comm_tod.finalize_chunk(pid+1)
 
 if (ntod//(2**22) != ntod/(2**22)):
     pid = n_chunks
-    pid_label = f'{pid:06}'
+    pid_label = f'{pid+1:06}'
     pid_common_group = pid_label + "/common"
-    pid_data_group = f'{pid_label}/{freq}'
+    for freq in freqs:
+        pid_data_group = f'{pid_label}/{freq:03}'
     
-    tod_chunk_i =   d[pid*2**22 : ]
-    pix_chunk_i = pix[pid*2**22 : ]
-    comm_tod.add_field(pid_common_group + "/ntod", [len(tod_chunk_i)])
-    comm_tod.add_field(pid_data_group + "/tod", tod_chunk_i)
-    comm_tod.add_field(pid_data_group + "/pix", pix_chunk_i)
-    comm_tod.finalize_chunk(pid)
+        tod_chunk_i =   d[pid*2**22 : ]
+        pix_chunk_i = pix[pid*2**22 : ]
+        comm_tod.add_field(pid_common_group + "/ntod", [len(tod_chunk_i)])
+        comm_tod.add_field(pid_data_group + "/tod", tod_chunk_i)
+        comm_tod.add_field(pid_data_group + "/pix", pix_chunk_i)
+    comm_tod.finalize_chunk(pid+1)
 
 
 comm_tod.finalize_file()

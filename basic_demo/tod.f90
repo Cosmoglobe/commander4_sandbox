@@ -52,7 +52,7 @@ subroutine tod_mapmaker(band, map_ifc, rms_ifc)
   use iso_c_binding
   implicit none
   integer(c_int64_t),  intent(in) :: band
-  real(c_double), intent(inout), dimension(0:) :: map_ifc, rms_ifc
+  real(c_double), intent(inout), dimension(0:), optional :: map_ifc, rms_ifc
 
 
   integer(8) :: i, j, scan, pix
@@ -74,8 +74,10 @@ subroutine tod_mapmaker(band, map_ifc, rms_ifc)
   ! Solve for map and rms
   data(band)%map = b/A
   data(band)%rms = 1.d0/sqrt(A)
-  map_ifc = data(band)%map
-  rms_ifc = data(band)%rms
+  if (present(map_ifc)) then
+      map_ifc(0:data(band)%npix-1) = data(band)%map(0:data(band)%npix-1)
+      rms_ifc(0:data(band)%npix-1) = data(band)%rms(0:data(band)%npix-1)
+  end if
 end subroutine tod_mapmaker
 
 end module tod_mod
