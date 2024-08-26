@@ -1,6 +1,8 @@
 program main
   use iso_c_binding
   use data_mod
+  use tod_mod
+  use compsep_mod
   implicit none
 
   integer(c_int64_t) :: nband, nside, npix, lmax, i, j, k, nscan, ntod, ngibbs, iter
@@ -57,7 +59,7 @@ program main
      
      ! Solve for best-fit map by CG
      allocate(signal(0:12*nside**2-1))
-     call compsep_compute_ax(signal, int(size(signal), c_int64_t))
+     call compsep_compute_Ax(signal, int(size(signal), c_int64_t))
      
      ! **********************
      ! TOD stage

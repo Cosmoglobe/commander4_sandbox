@@ -67,7 +67,6 @@ end module data_mod
 
 subroutine data_init_ifc(numband_arg) bind(c, name="data_init_ifc")
   use data_mod
-  use iso_c_binding
   implicit none
   integer(c_int64_t), intent(in) :: numband_arg
   print *, "data_init_ifc called with ",numband_arg
@@ -76,7 +75,6 @@ end subroutine data_init_ifc
 
 subroutine data_init_band_ifc(i, nside, lmax, fwhm) bind(c, name="data_init_band_ifc")
   use data_mod
-  use iso_c_binding
   implicit none
   integer(c_int64_t), intent(in) :: i, nside, lmax
   real(c_double),     intent(in) :: fwhm

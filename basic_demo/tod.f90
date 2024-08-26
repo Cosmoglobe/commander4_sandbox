@@ -1,7 +1,11 @@
-subroutine tod_init_band(band, nscan) bind(c, name="tod_init_band")
-  use data_mod
-  use iso_c_binding
-  implicit none
+module tod_mod
+use data_mod
+use iso_c_binding
+implicit none
+
+contains
+
+subroutine tod_init_band(band, nscan)
   integer(c_int64_t), intent(in) :: band, nscan
   
   print *, "tod_init_band called with ", band, nscan
@@ -11,10 +15,7 @@ subroutine tod_init_band(band, nscan) bind(c, name="tod_init_band")
   
 end subroutine tod_init_band
 
-subroutine tod_init_scan(band, scan, ntod, d, pix) bind(c, name="tod_init_scan")
-  use data_mod
-  use iso_c_binding
-  implicit none
+subroutine tod_init_scan(band, scan, ntod, d, pix)
   integer(c_int64_t), intent(in) :: band, scan, ntod
   real(c_float),      intent(in) :: d(ntod)
   integer(c_int32_t), intent(in) :: pix(ntod)
@@ -28,10 +29,7 @@ subroutine tod_init_scan(band, scan, ntod, d, pix) bind(c, name="tod_init_scan")
 
 end subroutine tod_init_scan
 
-subroutine tod_estimate_sigma0(band, scan, signal, npix) bind(c, name="tod_estimate_sigma0")
-  use data_mod
-  use iso_c_binding
-  implicit none
+subroutine tod_estimate_sigma0(band, scan, signal, npix)
   integer(c_int64_t), intent(in)  :: band, scan, npix
   real(c_double),     intent(in)  :: signal(npix)
 
@@ -47,7 +45,7 @@ subroutine tod_estimate_sigma0(band, scan, signal, npix) bind(c, name="tod_estim
   
 end subroutine tod_estimate_sigma0
 
-subroutine tod_mapmaker(band) bind(c, name="tod_mapmaker")
+subroutine tod_mapmaker(band)
   use data_mod
   use iso_c_binding
   implicit none
@@ -71,3 +69,40 @@ subroutine tod_mapmaker(band) bind(c, name="tod_mapmaker")
   data(band)%rms = 1.d0/sqrt(A)
     
 end subroutine tod_mapmaker
+
+end module tod_mod
+
+subroutine tod_init_band_ifc(band, nscan) bind(c, name="tod_init_band_ifc")
+  use tod_mod
+  implicit none
+  integer(c_int64_t), intent(in) :: band, nscan
+  
+  call tod_init_band(band, nscan)
+end subroutine tod_init_band_ifc
+
+subroutine tod_init_scan_ifc(band, scan, ntod, d, pix) bind(c, name="tod_init_scan_ifc")
+  use tod_mod
+  implicit none
+  integer(c_int64_t), intent(in) :: band, scan, ntod
+  real(c_float),      intent(in) :: d(ntod)
+  integer(c_int32_t), intent(in) :: pix(ntod)
+
+  call tod_init_scan(band, scan, ntod, d, pix)
+end subroutine tod_init_scan_ifc
+
+subroutine tod_estimate_sigma0_ifc(band, scan, signal, npix) bind(c, name="tod_estimate_sigma0_ifc")
+  use tod_mod
+  implicit none
+  integer(c_int64_t), intent(in)  :: band, scan, npix
+  real(c_double),     intent(in)  :: signal(npix)
+
+  call tod_estimate_sigma0(band, scan, signal, npix)
+end subroutine tod_estimate_sigma0_ifc
+
+subroutine tod_mapmaker_ifc(band) bind(c, name="tod_mapmaker_ifc")
+  use tod_mod
+  implicit none
+  integer(c_int64_t),  intent(in) :: band
+
+  call tod_mapmaker(band)
+end subroutine tod_mapmaker_ifc
