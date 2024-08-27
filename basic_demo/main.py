@@ -95,7 +95,6 @@ for iter in range(1,ngibbs+1):
         m_i   = np.zeros(12*nside**2, dtype=dbl)
         rms_i = np.zeros(12*nside**2, dtype=dbl)
         fortlib.tod_mapmaker_ifc(i+1, m_i, rms_i, npix)
-        #print(m_i)
         hp.write_map(f'output/map_band_{i:02}_c{iter:06}.fits', m_i,
                 overwrite=True, dtype=dbl)
         hp.write_map(f'output/rms_band_{i:02}_c{iter:06}.fits', rms_i,
