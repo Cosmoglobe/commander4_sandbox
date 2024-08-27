@@ -16,10 +16,6 @@ i64 = ct.c_int64
 i32 = ct.c_int32
 dbl = ct.c_double
 flt = ct.c_float
-p_i32 = ct.POINTER(ct.c_int32)
-p_i64 = ct.POINTER(ct.c_int64)
-p_flt = ct.POINTER(ct.c_float)
-p_dbl = ct.POINTER(ct.c_double)
 a_f32_1 = np.ctypeslib.ndpointer(dtype=ct.c_float, ndim=1, flags="F")
 a_f64_1 = np.ctypeslib.ndpointer(dtype=ct.c_double, ndim=1, flags="F")
 a_i32_1 = np.ctypeslib.ndpointer(dtype=ct.c_int32, ndim=1, flags="F")
