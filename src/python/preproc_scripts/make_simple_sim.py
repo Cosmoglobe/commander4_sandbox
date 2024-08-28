@@ -17,11 +17,13 @@ import astropy.units as u
 from commander_tod import commander_tod
 
 
-nside = 2048
+nside = 256
 lmax = 6000
 fwhm = 10*u.arcmin
 sigma0s = [100, 80, 30, 150, 220]
 freqs = [30, 70, 100, 217, 353]
+
+chunk_size = 2**16
 
 ell = np.arange(lmax+1)
 Cl = np.zeros(len(ell))
@@ -36,6 +38,7 @@ npix = 12*nside**2
 ntod = 9*npix
 
 pix = np.arange(ntod) % npix
+print(pix.max())
 d = m[pix]
 ds = []
 for i in range(len(freqs)):
@@ -45,7 +48,7 @@ d = d.astype('float32')
 pix = pix.astype('int32')
 
 
-n_chunks = ntod // (2**22)
+n_chunks = ntod // chunk_size
 
 
 
@@ -69,24 +72,25 @@ for pid in range(n_chunks):
     for i, freq in enumerate(freqs):
         pid_data_group = f'{pid_label}/{freq:03}'
 
-        comm_tod.add_field(pid_common_group + "/ntod", [2**22])
+        comm_tod.add_field(pid_common_group + "/ntod", [chunk_size])
 
 
-        tod_chunk_i = ds[i][pid*2**22 : (pid+1)*2**22]
-        pix_chunk_i =   pix[pid*2**22 : (pid+1)*2**22]
+        tod_chunk_i = ds[i][pid*chunk_size : (pid+1)*chunk_size]
+        pix_chunk_i =   pix[pid*chunk_size : (pid+1)*chunk_size]
+        print(pix_chunk_i.max(), 12*nside**2)
         comm_tod.add_field(pid_data_group + "/tod", tod_chunk_i)
         comm_tod.add_field(pid_data_group + "/pix", pix_chunk_i)
     comm_tod.finalize_chunk(pid+1)
 
-if (ntod//(2**22) != ntod/(2**22)):
+if (ntod//chunk_size != ntod/chunk_size):
     pid = n_chunks
     pid_label = f'{pid+1:06}'
     pid_common_group = pid_label + "/common"
     for i, freq in enumerate(freqs):
         pid_data_group = f'{pid_label}/{freq:03}'
     
-        tod_chunk_i = ds[i][pid*2**22 : ]
-        pix_chunk_i = pix[pid*2**22 : ]
+        tod_chunk_i = ds[i][pid*chunk_size : ]
+        pix_chunk_i = pix[pid*chunk_size : ]
         comm_tod.add_field(pid_common_group + "/ntod", [len(tod_chunk_i)])
         comm_tod.add_field(pid_data_group + "/tod", tod_chunk_i)
         comm_tod.add_field(pid_data_group + "/pix", pix_chunk_i)
