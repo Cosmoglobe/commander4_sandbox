@@ -36,10 +36,10 @@ fortlib.tod_estimate_sigma0_ifc.argtypes = [i64, i64, a_f64_1, i64]
 fortlib.tod_mapmaker_ifc.argtypes        = [i64, a_f64_1, a_f64_1, i64]
 
 ngibbs = 5
-nband  = 1
+nband  = 5
 nscan  = 108
-ntod   = 2**16
-nside  = 256
+ntod   = 2**22
+nside  = 2048
 npix   = 12*nside*nside
 lmax   = 512
 fwhm   = 0.42
@@ -51,18 +51,16 @@ for i in range(nband):
     fortlib.data_init_band_ifc(i+1, nside, lmax, fwhm)
 
 
-data = h5py.File('../src/python/preproc_scripts/tod_example.h5')
+h5file = '../src/python/preproc_scripts/tod_example.h5'
 bands = ['030', '070', '100', '217', '353']
 # Initialize TOD data
-for i in range(nband):
-    fortlib.tod_init_band_ifc(i+1, nscan)
-    for j in range(nscan):
-        d = np.zeros(ntod, dtype=np.float32)
-        pix = np.zeros(ntod, dtype=np.int32)
-        for k in range(ntod):
-            d[k] = (k+1)%4 + 0.6
-            pix[k] = (k+1)%npix
-        fortlib.tod_init_scan_ifc(i+1, j+1, ntod, d, pix)
+with h5py.File(h5file) as data:
+    for i in range(nband):
+        fortlib.tod_init_band_ifc(i+1, nscan)
+        for j in range(nscan):
+            d = data[f'{j+1:06}/{bands[i]}/tod'][()]
+            pix = data[f'{j+1:06}/{bands[i]}/pix'][()]
+            fortlib.tod_init_scan_ifc(i+1, j+1, ntod, d, pix)
 
 # Run Gibbs sampler
 for iter in range(1,ngibbs+1):

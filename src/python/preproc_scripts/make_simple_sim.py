@@ -20,8 +20,7 @@ from commander_tod import commander_tod
 nside = 2048
 lmax = 6000
 fwhm = 10*u.arcmin
-sigma0 = 30
-freq = '90'
+sigma0s = [100, 80, 30, 150, 220]
 freqs = [30, 70, 100, 217, 353]
 
 ell = np.arange(lmax+1)
@@ -38,7 +37,9 @@ ntod = 9*npix
 
 pix = np.arange(ntod) % npix
 d = m[pix]
-d += np.random.randn(ntod)*sigma0
+ds = []
+for i in range(len(freqs)):
+    ds.append((d + np.random.randn(ntod)*sigma0s[i]).astype('float32'))
 
 d = d.astype('float32')
 pix = pix.astype('int32')
@@ -65,14 +66,14 @@ comm_tod.add_field(COMMON_GROUP + "/nside", [nside])
 for pid in range(n_chunks):
     pid_label = f'{pid+1:06}'
     pid_common_group = pid_label + "/common"
-    for freq in freqs:
+    for i, freq in enumerate(freqs):
         pid_data_group = f'{pid_label}/{freq:03}'
 
         comm_tod.add_field(pid_common_group + "/ntod", [2**22])
 
 
-        tod_chunk_i =   d[pid*2**22 : (pid+1)*2**22]
-        pix_chunk_i = pix[pid*2**22 : (pid+1)*2**22]
+        tod_chunk_i = ds[i][pid*2**22 : (pid+1)*2**22]
+        pix_chunk_i =   pix[pid*2**22 : (pid+1)*2**22]
         comm_tod.add_field(pid_data_group + "/tod", tod_chunk_i)
         comm_tod.add_field(pid_data_group + "/pix", pix_chunk_i)
     comm_tod.finalize_chunk(pid+1)
@@ -81,10 +82,10 @@ if (ntod//(2**22) != ntod/(2**22)):
     pid = n_chunks
     pid_label = f'{pid+1:06}'
     pid_common_group = pid_label + "/common"
-    for freq in freqs:
+    for i, freq in enumerate(freqs):
         pid_data_group = f'{pid_label}/{freq:03}'
     
-        tod_chunk_i =   d[pid*2**22 : ]
+        tod_chunk_i = ds[i][pid*2**22 : ]
         pix_chunk_i = pix[pid*2**22 : ]
         comm_tod.add_field(pid_common_group + "/ntod", [len(tod_chunk_i)])
         comm_tod.add_field(pid_data_group + "/tod", tod_chunk_i)
