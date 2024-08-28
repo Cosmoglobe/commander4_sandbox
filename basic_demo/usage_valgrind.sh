@@ -8,6 +8,8 @@ valgrind ./main
 
 # Python driver
 # NB Python will cause a few valgrind warnings on startup. Just make sure
-# there aren't any warnings after the code proper has started to run.
+# there aren't any warnings after the actual script has started to run.
+# If you get thousands of warnings when running valgrind on Python, try
+#   export PYTHONMALLOC=malloc
 gfortran data_mod.f90 compsep.f90 tod.f90 -fbacktrace -O3 -C -fPIC -shared -o libcommander.so -g
 LD_LIBRARY_PATH=. valgrind python3 main.py
