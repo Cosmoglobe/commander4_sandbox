@@ -38,7 +38,6 @@ npix = 12*nside**2
 ntod = 9*npix
 
 pix = np.arange(ntod) % npix
-print(pix.max())
 d = m[pix]
 ds = []
 for i in range(len(freqs)):
@@ -77,7 +76,7 @@ for pid in range(n_chunks):
 
         tod_chunk_i = ds[i][pid*chunk_size : (pid+1)*chunk_size]
         pix_chunk_i =   pix[pid*chunk_size : (pid+1)*chunk_size]
-        print(pix_chunk_i.max(), 12*nside**2)
+        
         comm_tod.add_field(pid_data_group + "/tod", tod_chunk_i)
         comm_tod.add_field(pid_data_group + "/pix", pix_chunk_i)
     comm_tod.finalize_chunk(pid+1)

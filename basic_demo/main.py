@@ -55,11 +55,13 @@ h5file = '../src/python/preproc_scripts/tod_example.h5'
 bands = ['030', '070', '100', '217', '353']
 # Initialize TOD data
 with h5py.File(h5file) as data:
+    nscan = len(data.keys())-1
     for i in range(nband):
         fortlib.tod_init_band_ifc(i+1, nscan)
         for j in range(nscan):
             d = data[f'{j+1:06}/{bands[i]}/tod'][()]
             pix = data[f'{j+1:06}/{bands[i]}/pix'][()]
+            ntod = data[f'{j+1:06}/common/ntod'][0]
             fortlib.tod_init_scan_ifc(i+1, j+1, ntod, d, pix)
 
 # Run Gibbs sampler
