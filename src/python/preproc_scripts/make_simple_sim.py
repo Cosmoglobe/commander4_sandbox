@@ -31,7 +31,7 @@ Cl[2:] = 1./ell[2:]**2
 
 np.random.seed(0)
 m = hp.synfast(Cl, nside, lmax=lmax, fwhm = fwhm.to('rad').value)
-
+hp.write_map("true_sky.fits", m, overwrite=True)
 
 npix = 12*nside**2
 
