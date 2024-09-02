@@ -55,8 +55,8 @@ class Gibbs:
         Ax = hp.smoothalm(x, FWHM, inplace=False)
         YAx = hp.alm2map(Ax, self.nside, self.lmax)
         NYAx = YAx.copy()/self.map_rms**2
-        YTNYAx = hp.map2alm(NYAx, self.lmax)
-        ATYTNYAx = hp.smoothalm(YTNYAx, FWHM, inplace=False)/(4*np.pi/self.npix)
+        YTNYAx = hp.map2alm(NYAx, self.lmax, iter=0)/(4*np.pi/self.npix)
+        ATYTNYAx = hp.smoothalm(YTNYAx, FWHM, inplace=False)
         return ATYTNYAx + hp.almxfl(x, 1.0/self.Cl_sample)
 
 
@@ -66,8 +66,8 @@ class Gibbs:
             N is the noise covariance, and A is the beam.
         """
         Nd = self.map_sky/self.map_rms**2
-        YTNd = hp.map2alm(Nd)
-        ATYTNd = hp.smoothalm(YTNd, FWHM, inplace=False)/(4*np.pi/self.npix)
+        YTNd = hp.map2alm(Nd, iter=0)/(4*np.pi/self.npix)
+        ATYTNd = hp.smoothalm(YTNd, FWHM, inplace=False)
         return ATYTNd
 
 
@@ -76,14 +76,14 @@ class Gibbs:
             This RHS can be written as (C^-1/2 Y^T omega0 + A^T Y^T N^-1/2 omega1), where omega0 and omega1 are N(0,1) maps,
             and C is the currentl C(ell) sample.
         """
-        YTomega0 = hp.map2alm(np.random.normal(0, 1, self.npix))
+        YTomega0 = hp.map2alm(np.random.normal(0, 1, self.npix), iter=0)
         CYTomega0 = hp.almxfl(YTomega0, np.sqrt(1.0/self.Cl_sample))
         CYTomega0 = hp.synalm(1.0/self.Cl_sample, self.lmax)
 
         omega1 = np.random.normal(0, 1, self.npix)
         Nomega1 = omega1.copy()/self.map_rms
-        YTNomega1 = hp.map2alm(Nomega1)
-        ATYTNomega1 = hp.smoothalm(YTNomega1, FWHM, inplace=False)/(4*np.pi/self.npix)
+        YTNomega1 = hp.map2alm(Nomega1, iter=0)/(4*np.pi/self.npix)
+        ATYTNomega1 = hp.smoothalm(YTNomega1, FWHM, inplace=False)
         return ATYTNomega1 + CYTomega0
 
 
@@ -97,9 +97,15 @@ class Gibbs:
             Returns:
                 m_bestfit: The resulting best-fit solution, transformed from alm to map space.
         """
-        s_bestfit, _ = cg(LHS, RHS, maxiter=10)
-        m_bestfit = hp.alm2map(s_bestfit, self.nside, self.lmax)
-        return m_bestfit
+        global CG_n_iter
+        CG_n_iter=0
+        def CG_callback_func(CG_data):
+            global CG_n_iter
+            if CG_n_iter%10==0:
+                print(f"{CG_n_iter:4d}   {np.linalg.norm(LHS(CG_data)-RHS): 3.6f}")
+            CG_n_iter += 1
+        s_bestfit, _ = cg(LHS, RHS, maxiter=51, callback=CG_callback_func)
+        return s_bestfit
 
 
     def tod_estimate_sigma0(self):
@@ -141,7 +147,7 @@ class Gibbs:
     def sample_Cl(self):
         """ Sample C(ell) from the current 
         """
-        Cl_signal = hp.alm2cl(hp.map2alm(self.map_signal_mean + self.map_signal_fluct))
+        Cl_signal = hp.alm2cl(hp.map2alm(self.map_signal_mean + self.map_signal_fluct, iter=0))
         rho = np.zeros(self.lmax+1)
         for i in range(self.lmax):
             rho[i+1] = np.sum(np.random.normal(0, 1, 2*(i+1))**2)/(2*(i+1))
@@ -185,8 +191,10 @@ class Gibbs:
             compsep_RHS_eqn_fluct = self.get_RHS_eqn_fluct()
             # Solve for best-fit map by CG
             compsep_LHS = LinearOperator(shape=((self.alm_len, self.alm_len)), matvec=self.LHS_func)
-            self.map_signal_mean = self.compsep_compute_Ax(compsep_LHS, compsep_RHS_eqn_mean)
-            self.map_signal_fluct = self.compsep_compute_Ax(compsep_LHS, compsep_RHS_eqn_fluct)
+            self.alm_signal_mean = self.compsep_compute_Ax(compsep_LHS, compsep_RHS_eqn_mean)
+            self.map_signal_mean = hp.alm2map(self.alm_signal_mean, self.nside, self.lmax)
+            self.alm_signal_fluct = self.compsep_compute_Ax(compsep_LHS, compsep_RHS_eqn_fluct)
+            self.map_signal_fluct = hp.alm2map(self.alm_signal_fluct, self.nside, self.lmax)
             # Re-project the sky realization onto the TOD
             self.map2tod()
             
