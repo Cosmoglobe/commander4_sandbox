@@ -15,6 +15,10 @@ import numpy as np
 import healpy as hp
 import astropy.units as u
 from commander_tod import commander_tod
+import matplotlib.pyplot as plt
+
+import camb
+from camb import model, initialpower
 
 
 nside = 256
@@ -23,15 +27,25 @@ fwhm = 10*u.arcmin
 sigma0s = [100, 80, 30, 150, 220]
 freqs = [30, 70, 100, 217, 353]
 
-chunk_size = 2**16
+
+pars = camb.set_params(H0=67.5, ombh2=0.022, omch2=0.122, mnu=0.06, omk=0, tau=0.06,
+                       As=2e-9, ns=0.965, halofit_version='mead', lmax=lmax)
+
+results = camb.get_results(pars)
+powers =results.get_cmb_power_spectra(pars, CMB_unit='muK', raw_cl=True)
+totCL=powers['total']
 
 ell = np.arange(lmax+1)
-Cl = np.zeros(len(ell))
-Cl[2:] = 1./ell[2:]**2
+Cl = totCL[ell,0]
+
+
+chunk_size = 2**16
 
 np.random.seed(0)
-m = hp.synfast(Cl, nside, lmax=lmax, fwhm = fwhm.to('rad').value)
+m = hp.synfast(Cl, nside, lmax=lmax) #, fwhm = fwhm.to('rad').value)
 hp.write_map("true_sky.fits", m, overwrite=True)
+
+m = hp.smoothing(m, fwhm=fwhm.to('rad').value)
 
 npix = 12*nside**2
 

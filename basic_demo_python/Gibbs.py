@@ -10,7 +10,7 @@ NSIDE   = 256
 LMAX = 3*NSIDE-1
 NTOD = 2**16
 NSCAN = 108
-VERBOSE = False
+VERBOSE = True
 
 ell = np.arange(LMAX+1)
 Cl_true = np.zeros(len(ell))
@@ -108,7 +108,7 @@ class Gibbs:
         """
         CG_solver = utils.CG(LHS, RHS, dot=dot_alm)
         err_tol = 1e-6
-        maxiter = 201
+        maxiter = 251
         iter = 0
         while CG_solver.err > err_tol:
             CG_solver.step()
@@ -229,7 +229,7 @@ class Gibbs:
 
 
 if __name__ == "__main__":
-    ngibbs = 4
+    ngibbs = 250
     gibbs = Gibbs()
-    gibbs.read_tod_from_file('../src/python/preproc_scripts/tod_example_rmsx10.h5', ['030', '070', '100', '217', '353'])
+    gibbs.read_tod_from_file('../src/python/preproc_scripts/tod_example.h5', ['030', '070', '100', '217', '353'])
     gibbs.solve(ngibbs)
