@@ -1,6 +1,7 @@
 import numpy as np
 import healpy as hp
 import h5py
+from pixell import utils
 from scipy.sparse.linalg import cg, LinearOperator
 
 # Some global variables - should be read from a parameter file.
@@ -9,11 +10,19 @@ NSIDE   = 256
 LMAX = 3*NSIDE-1
 NTOD = 2**16
 NSCAN = 108
+VERBOSE = False
 
 ell = np.arange(LMAX+1)
 Cl_true = np.zeros(len(ell))
 Cl_true[2:] = 1./ell[2:]**2  # True Cl used in the "make_simple_sim.py" script.
 Cl_true[:2] = 1e-12
+
+def dot_alm(alm1, alm2):
+    """ Function calculating the dot product of two alms, given that they follow the Healpy standard,
+        where alms are represented as complex numbers, but with the conjugate 'negative' ms missing.
+    """
+    return np.sum((alm1[:LMAX]*alm2[:LMAX]).real) + np.sum((alm1[LMAX:]*np.conj(alm2[LMAX:])).real*2)
+
 
 
 class Gibbs:
@@ -88,23 +97,30 @@ class Gibbs:
 
 
     def compsep_compute_Ax(self, LHS, RHS):
-        """ Solves the equation Ax=b for x given A (LHS) and b (RHS).
+        """ Solves the equation Ax=b for x given A (LHS) and b (RHS) using CG from the pixell package.
             Assumes that both x and b are in alm space.
 
             Args:
-                LHS: A Scipy LinearOperator taking x as input and returning Ax.
+                LHS: A callable taking x as argument and returning Ax.
                 RHS: A Numpy array representing b, in alm space.
             Returns:
-                m_bestfit: The resulting best-fit solution, transformed from alm to map space.
+                m_bestfit: The resulting best-fit solution, in alm space.
         """
-        global CG_n_iter
-        CG_n_iter=0
-        def CG_callback_func(CG_data):
-            global CG_n_iter
-            if CG_n_iter%10==0:
-                print(f"{CG_n_iter:4d}   {np.linalg.norm(LHS(CG_data)-RHS): 3.6f}")
-            CG_n_iter += 1
-        s_bestfit, _ = cg(LHS, RHS, maxiter=51, callback=CG_callback_func)
+        CG_solver = utils.CG(LHS, RHS, dot=dot_alm)
+        err_tol = 1e-6
+        maxiter = 201
+        iter = 0
+        while CG_solver.err > err_tol:
+            CG_solver.step()
+            iter += 1
+            if VERBOSE and iter%10 == 1:
+                print(f"CG iter {iter:3d} - Residual {CG_solver.err:.3e}")
+            if iter >= maxiter:
+                print(f"Warning: Maximum number of iterations ({maxiter}) reached in CG.")
+                break
+        print(f"CG finished after {iter} iterations with a residual of {CG_solver.err:.3e} (err tol = {err_tol})")
+        s_bestfit = CG_solver.x
+
         return s_bestfit
 
 
