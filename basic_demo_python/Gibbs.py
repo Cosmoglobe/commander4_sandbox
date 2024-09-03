@@ -3,6 +3,7 @@ import healpy as hp
 import h5py
 import ducc0
 from pixell import utils
+import time
 from scipy.sparse.linalg import cg, LinearOperator
 
 # number of threads that ducc0 should use. NOte that this can be varied on a
@@ -15,7 +16,7 @@ NSIDE   = 256
 LMAX = 3*NSIDE-1
 NTOD = 2**16
 NSCAN = 108
-VERBOSE = True
+VERBOSE = False
 
 ell = np.arange(LMAX+1)
 Cl_true = np.zeros(len(ell))
@@ -107,8 +108,8 @@ class Gibbs:
             This RHS can be written as (C^-1/2 Y^T omega0 + A^T Y^T N^-1/2 omega1), where omega0 and omega1 are N(0,1) maps,
             and C is the currentl C(ell) sample.
         """
-        YTomega0 = hp.map2alm(np.random.normal(0, 1, self.npix), iter=0)
-        CYTomega0 = hp.almxfl(YTomega0, np.sqrt(1.0/self.Cl_sample))
+        # YTomega0 = hp.map2alm(np.random.normal(0, 1, self.npix), iter=0)#*(4*np.pi/self.npix)
+        # CYTomega0 = hp.almxfl(YTomega0, np.sqrt(1.0/self.Cl_sample))
         CYTomega0 = hp.synalm(1.0/self.Cl_sample, self.lmax)
 
         omega1 = np.random.normal(0, 1, self.npix)
@@ -183,9 +184,9 @@ class Gibbs:
 
 
     def sample_Cl(self):
-        """ Sample C(ell) from the current 
+        """ Sample C(ell) from the current CMB estimate.
         """
-        Cl_signal = hp.alm2cl(hp.map2alm(self.map_signal_mean + self.map_signal_fluct, iter=0))
+        Cl_signal = hp.alm2cl(self.alm_signal_mean + self.alm_signal_fluct)
         rho = np.zeros(self.lmax+1)
         for i in range(self.lmax):
             rho[i+1] = np.sum(np.random.normal(0, 1, 2*(i+1))**2)/(2*(i+1))
@@ -198,20 +199,24 @@ class Gibbs:
 
     def solve(self, niter):
         for iter in range(1, niter+1):
-            print(f'Gibbs iter = {iter} of {ngibbs}')
+            print(f'#### Gibbs iter = {iter} of {ngibbs} ####')
 
             # **********************
             # TOD stage
             # **********************
             # Estimate white noise rms per scan
+            t0 = time.time()
             self.tod_signalsubtracted = self.tod - self.tod_signal_sample
             self.tod_estimate_sigma0()
+            print(f">TOD sampling finished in {time.time()-t0:.2f}s.")
 
             # **********************
             # Mapmaking stage
             # **********************
             # Make frequency maps
+            t0 = time.time()
             self.tod_mapmaker()
+            print(f">Mapmaker finished in {time.time()-t0:.2f}s.")
             # Write maps to file.
             iband = 0
             hp.write_map(f'output/map_band_{iband:02}_c{iter:06}.fits', self.map_sky,
@@ -224,22 +229,28 @@ class Gibbs:
             # **********************
             # COMPSEP stage
             # **********************
+            t0 = time.time()
             # Compute RHS of comp-sep equation
             compsep_RHS_eqn_mean = self.get_RHS_eqn_mean()
             compsep_RHS_eqn_fluct = self.get_RHS_eqn_fluct()
             # Solve for best-fit map by CG
-            compsep_LHS = LinearOperator(shape=((self.alm_len, self.alm_len)), matvec=self.LHS_func)
+            compsep_LHS = LinearOperator(shape=((self.alm_len, self.alm_len)), matvec=self.LHS_func, dtype=np.complex128)
             self.alm_signal_mean = self.compsep_compute_Ax(compsep_LHS, compsep_RHS_eqn_mean)
             self.map_signal_mean = alm2map(self.alm_signal_mean, self.nside, self.lmax)
             self.alm_signal_fluct = self.compsep_compute_Ax(compsep_LHS, compsep_RHS_eqn_fluct)
             self.map_signal_fluct = alm2map(self.alm_signal_fluct, self.nside, self.lmax)
+            print(f">CompSep finished in {time.time()-t0:.2f}s.")
             # Re-project the sky realization onto the TOD
+            t0 = time.time()
             self.map2tod()
-            
+            print(f">Map->TOD projection finished in {time.time()-t0:.2f}s.")
+
             # **********************
             # C(ell) sampling
             # **********************
+            t0 = time.time()
             self.sample_Cl()
+            print(f">Cl sampling finished in {time.time()-t0:.2f}s.")
 
             # Write Wiener filtered and fluctuation maps to file.
             iband = 0  # Will later loop over bands.
