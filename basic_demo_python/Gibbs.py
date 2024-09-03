@@ -157,7 +157,6 @@ class Gibbs:
     def tod_mapmaker(self):
         """ A simple binned mapmaker for making observed sky and rms maps from the TOD scans and rms estimates.
             The only thing that changes in this function between Gibbs iterations is the sigma0-estimate.
-            TODO: It currently doesn't actually do noise-weighting, but all input scans have the same rms, so it doesn't matter yet.
         """
         self.map_sky[:] = 0.0
         self.map_hits[:] = 0.0
@@ -166,12 +165,12 @@ class Gibbs:
         for iscan in range(self.nscan):
             map_hits, _ = np.histogram(self.pix[iscan], range=(0, self.npix), bins=self.npix)
             self.map_hits += map_hits
-            map_sky, _ = np.histogram(self.pix[iscan], weights=self.tod[iscan], range=(0, self.npix), bins=self.npix)
+            map_sky, _ = np.histogram(self.pix[iscan], weights=self.tod[iscan]/self.sigma0_est[iscan]**2, range=(0, self.npix), bins=self.npix)
             self.map_sky += map_sky
             map_inv_var, _ = np.histogram(self.pix[iscan], weights=1.0/self.sigma0_est[iscan]**2*np.ones(self.ntod), range=(0, self.npix), bins=self.npix)
             self.map_inv_var += map_inv_var
         self.map_rms = 1.0/np.sqrt(self.map_inv_var)
-        self.map_sky /= self.map_hits
+        self.map_sky /= self.map_inv_var
         ipix_mask = hp.query_disc(self.nside, (10,0,0), np.radians(60))  # Quick way of simulating a "mask", aka a region of infinite rms.
         self.map_rms[ipix_mask] = np.inf
 
