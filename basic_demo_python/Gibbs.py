@@ -145,7 +145,7 @@ class Gibbs:
         """
         CG_solver = utils.CG(LHS, RHS, dot=dot_alm)
         err_tol = 1e-6
-        maxiter = 251
+        maxiter = 101
         iter = 0
         while CG_solver.err > err_tol:
             CG_solver.step()

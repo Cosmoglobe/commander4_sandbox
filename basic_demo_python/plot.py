@@ -10,7 +10,7 @@ try:
 except FileExistsError:
     pass
 
-NSIDE   = 256
+NSIDE   = 512
 NPIX = 12*NSIDE**2
 LMAX = 3*NSIDE-1
 
