@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <cmath>
 #include <iostream>
+#include <omp.h>
+#include <vector>
 
 extern "C"
 void mapmaker(double *map, double *map_inv_var, double *tod, int64_t *pix, double *scan_rms, int64_t scan_len, int64_t num_scans, int64_t num_pix){
@@ -52,8 +54,8 @@ void mapmaker_OMP(double *map, double *map_inv_var, double *tod, int64_t *pix, d
 
     #pragma omp parallel
     {
-        double *map_private = new double[num_pix];
-        double *map_inv_var_private = new double[num_pix];
+        std::vector<double> map_private(num_pix);
+        std::vector<double> map_inv_var_private(num_pix);
         #pragma omp for
         for(int64_t iscan=0; iscan<num_scans; iscan++){
             double scan_inv_var = 1.0/(scan_rms[iscan]*scan_rms[iscan]);
