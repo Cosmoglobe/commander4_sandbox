@@ -7,6 +7,8 @@ import time
 import ctypes as ct
 from scipy.sparse.linalg import cg, LinearOperator
 import os
+import os 
+current_dir_path = os.path.dirname(os.path.realpath(__file__))
 
 # number of threads that ducc0 should use. NOte that this can be varied on a
 # call-by-call basis if necessary.
@@ -187,7 +189,7 @@ class Gibbs:
         self.map_sky[:] = 0.0
         self.map_inv_var[:] = 0.0
         self.map_rms[:] = 0.0
-        maplib = ct.cdll.LoadLibrary("/home/jonas/github/commander4_sandbox/basic_demo_python/mapmaker.so")
+        maplib = ct.cdll.LoadLibrary(current_dir_path + "/mapmaker.so")
         ct_i64_dim2 = np.ctypeslib.ndpointer(dtype=ct.c_int64, ndim=2, flags="contiguous")
         ct_f64_dim1 = np.ctypeslib.ndpointer(dtype=ct.c_double, ndim=1, flags="contiguous")
         ct_f64_dim2 = np.ctypeslib.ndpointer(dtype=ct.c_double, ndim=2, flags="contiguous")
