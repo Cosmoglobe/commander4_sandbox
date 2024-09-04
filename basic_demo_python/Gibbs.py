@@ -4,6 +4,7 @@ import h5py
 import ducc0
 from pixell import utils
 import time
+import ctypes as ct
 from scipy.sparse.linalg import cg, LinearOperator
 import os
 
@@ -72,7 +73,6 @@ class Gibbs:
         """
         self.tod = np.zeros((self.nband, self.nscan, self.ntod), dtype=np.float64)
         self.pix = np.zeros((self.nband, self.nscan, self.ntod), dtype=int)
-        iband = 0  # To be replaced with loop over bands.
         with h5py.File(h5_filename) as f:
             for iband in range(self.nband):
                 for iscan in range(self.nscan):
@@ -166,7 +166,7 @@ class Gibbs:
         self.sigma0_est = np.std(self.tod_signalsubtracted[...,1:] - self.tod_signalsubtracted[...,:-1], axis=-1)/np.sqrt(2)
 
 
-    def tod_mapmaker(self):
+    def tod_mapmaker_purepython(self):
         """ A simple binned mapmaker for making observed sky and rms maps from the TOD scans and rms estimates.
             The only thing that changes in this function between Gibbs iterations is the sigma0-estimate.
         """
@@ -175,12 +175,27 @@ class Gibbs:
         self.map_rms[:] = 0.0
         for iband in range(self.nband):
             for iscan in range(self.nscan):
-                map_sky, _ = np.histogram(self.pix[iband,iscan], weights=self.tod[iband,iscan]/self.sigma0_est[iband,iscan]**2, range=(0, self.npix), bins=self.npix)
-                self.map_sky[iband] += map_sky
-                map_inv_var, _ = np.histogram(self.pix[iband,iscan], weights=1.0/self.sigma0_est[iband,iscan]**2*np.ones(self.ntod), range=(0, self.npix), bins=self.npix)
-                self.map_inv_var[iband] += map_inv_var
+                self.map_sky[iband] += np.bincount(self.pix[iband,iscan], weights=self.tod[iband,iscan]/self.sigma0_est[iband,iscan]**2, minlength=self.npix)
+                self.map_inv_var[iband] += np.bincount(self.pix[iband,iscan], weights=1.0/self.sigma0_est[iband,iscan]**2*np.ones(self.ntod), minlength=self.npix)
         self.map_rms = 1.0/np.sqrt(self.map_inv_var)
         self.map_sky /= self.map_inv_var
+        ipix_mask = hp.query_disc(self.nside, (10,0,0), np.radians(60))  # Quick way of simulating a "mask", aka a region of infinite rms.
+        self.map_rms[:,ipix_mask] = np.inf
+
+
+    def tod_mapmaker(self):
+        self.map_sky[:] = 0.0
+        self.map_inv_var[:] = 0.0
+        self.map_rms[:] = 0.0
+        maplib = ct.cdll.LoadLibrary("/home/jonas/github/commander4_sandbox/basic_demo_python/mapmaker.so")
+        ct_i64_dim2 = np.ctypeslib.ndpointer(dtype=ct.c_int64, ndim=2, flags="contiguous")
+        ct_f64_dim1 = np.ctypeslib.ndpointer(dtype=ct.c_double, ndim=1, flags="contiguous")
+        ct_f64_dim2 = np.ctypeslib.ndpointer(dtype=ct.c_double, ndim=2, flags="contiguous")
+        # Replace maplib.mapmaker with maplib.mapmakerOMP for parallelized version (worth it if pixels are hit many times, >>10).
+        maplib.mapmaker.argtypes = [ct_f64_dim1, ct_f64_dim1, ct_f64_dim2, ct_i64_dim2, ct_f64_dim1, ct.c_int64, ct.c_int64, ct.c_int64]
+        for iband in range(self.nband):
+            maplib.mapmaker(self.map_sky[iband], self.map_inv_var[iband], self.tod[iband], self.pix[iband], self.sigma0_est[iband], self.ntod, self.nscan, self.npix)
+        self.map_rms = 1.0/np.sqrt(self.map_inv_var)
         ipix_mask = hp.query_disc(self.nside, (10,0,0), np.radians(60))  # Quick way of simulating a "mask", aka a region of infinite rms.
         self.map_rms[:,ipix_mask] = np.inf
 
@@ -275,6 +290,7 @@ if __name__ == "__main__":
         os.mkdir('output')
     except FileExistsError:
         pass
+    np.random.seed(128)
     ngibbs = 250
     gibbs = Gibbs()
     gibbs.read_tod_from_file('../src/python/preproc_scripts/tod_example.h5', ['030', '070', '100', '217', '353'])
