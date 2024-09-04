@@ -21,10 +21,10 @@ import camb
 from camb import model, initialpower
 
 
-nside = 2048
+nside = 512
 lmax = 3*nside
 fwhm = 10*u.arcmin
-sigma0s = [100, 80, 30, 150, 220]
+sigma0s = np.array([100, 80, 30, 150, 220])/1e3
 freqs = [30, 70, 100, 217, 353]
 
 
@@ -45,10 +45,11 @@ Cls = np.array([Cl, Cl_EE, Cl_BB, Cl_TE])
 
 
 
+
 chunk_size = 2**16
 
 np.random.seed(0)
-alms = hp.synalm(Cls, lmax=3*nside-1)
+alms = hp.synalm(Cls, lmax=3*nside-1, new=True)
 ms   = hp.alm2map(alms, nside, pixwin=False)
 hp.write_map("true_sky.fits", ms, overwrite=True)
 
