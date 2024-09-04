@@ -21,7 +21,7 @@ import camb
 from camb import model, initialpower
 
 
-nside = 256
+nside = 512
 lmax = 6000
 fwhm = 10*u.arcmin
 sigma0s = [100, 80, 30, 150, 220]
@@ -42,7 +42,7 @@ Cl = totCL[ell,0]
 chunk_size = 2**16
 
 np.random.seed(0)
-m = hp.synfast(Cl, nside, lmax=lmax) #, fwhm = fwhm.to('rad').value)
+m = hp.synfast(Cl, nside, lmax=3*nside-1) #, fwhm = fwhm.to('rad').value)
 hp.write_map("true_sky.fits", m, overwrite=True)
 
 m = hp.smoothing(m, fwhm=fwhm.to('rad').value)

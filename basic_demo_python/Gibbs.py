@@ -16,7 +16,7 @@ nthreads = 20
 
 # Some global variables - should be read from a parameter file.
 FWHM    = 0.16666*np.pi/180.0*np.ones(5)
-NSIDE   = 256
+NSIDE   = 512
 LMAX = 3*NSIDE-1
 NTOD = 2**16
 NSCAN = 108
@@ -226,6 +226,7 @@ class Gibbs:
 
     def solve(self, niter):
         for iter in range(1, niter+1):
+            t0_Gibbs = time.time()
             print(f'#### Gibbs iter = {iter} of {ngibbs} ####')
 
             # **********************
@@ -286,6 +287,7 @@ class Gibbs:
                     overwrite=True, dtype=np.float64)
             np.save(f"output/Cl_sample_c{iter:06}.npy", self.Cl_sample)
 
+            print(f">>Gibbs iteration finished in {time.time()-t0_Gibbs:.2f}s.")
 
 if __name__ == "__main__":
     try:
