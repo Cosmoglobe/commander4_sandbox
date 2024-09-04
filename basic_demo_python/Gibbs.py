@@ -5,6 +5,7 @@ import ducc0
 from pixell import utils
 import time
 from scipy.sparse.linalg import cg, LinearOperator
+import os
 
 # number of threads that ducc0 should use. NOte that this can be varied on a
 # call-by-call basis if necessary.
@@ -270,6 +271,10 @@ class Gibbs:
 
 
 if __name__ == "__main__":
+    try:
+        os.mkdir('output')
+    except FileExistsError:
+        pass
     ngibbs = 250
     gibbs = Gibbs()
     gibbs.read_tod_from_file('../src/python/preproc_scripts/tod_example.h5', ['030', '070', '100', '217', '353'])
