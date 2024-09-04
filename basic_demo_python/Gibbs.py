@@ -16,10 +16,10 @@ nthreads = 20
 
 # Some global variables - should be read from a parameter file.
 FWHM    = 0.16666*np.pi/180.0*np.ones(5)
-NSIDE   = 256
+NSIDE   = 2048
 LMAX = 3*NSIDE-1
 NTOD = 2**16
-NSCAN = 108
+NSCAN = 6912
 VERBOSE = False
 
 ell = np.arange(LMAX+1)
@@ -61,7 +61,7 @@ class Gibbs:
         self.lmax = LMAX
         self.alm_len = ((LMAX+1)*(LMAX+2))//2
         self.nscan  = NSCAN
-        self.nband = 5
+        self.nband = 2
         self.fwhm = FWHM[:self.nband]
 
         self.map_rms = np.zeros((self.nband, self.npix))
@@ -135,7 +135,7 @@ class Gibbs:
         return RHS_sum
 
 
-    def compsep_compute_Ax(self, LHS, RHS):
+    def compsep_compute_Ax(self, LHS, RHS, iter_no=None):
         """ Solves the equation Ax=b for x given A (LHS) and b (RHS) using CG from the pixell package.
             Assumes that both x and b are in alm space.
 
@@ -147,7 +147,10 @@ class Gibbs:
         """
         CG_solver = utils.CG(LHS, RHS, dot=dot_alm)
         err_tol = 1e-6
-        maxiter = 101
+        if iter_no == 1:
+            maxiter = 21
+        else:
+            maxiter = 101
         iter = 0
         while CG_solver.err > err_tol:
             CG_solver.step()
@@ -265,9 +268,9 @@ class Gibbs:
             compsep_RHS_eqn_fluct = self.get_RHS_eqn_fluct()
             # Solve for best-fit map by CG
             compsep_LHS = LinearOperator(shape=((self.alm_len, self.alm_len)), matvec=self.LHS_func, dtype=np.complex128)
-            self.alm_signal_mean = self.compsep_compute_Ax(compsep_LHS, compsep_RHS_eqn_mean)
+            self.alm_signal_mean = self.compsep_compute_Ax(compsep_LHS, compsep_RHS_eqn_mean, iter_no=iter)
             self.map_signal_mean = alm2map(self.alm_signal_mean, self.nside, self.lmax)
-            self.alm_signal_fluct = self.compsep_compute_Ax(compsep_LHS, compsep_RHS_eqn_fluct)
+            self.alm_signal_fluct = self.compsep_compute_Ax(compsep_LHS, compsep_RHS_eqn_fluct, iter_no=iter)
             self.map_signal_fluct = alm2map(self.alm_signal_fluct, self.nside, self.lmax)
             print(f">CompSep finished in {time.time()-t0:.2f}s.")
             # Re-project the sky realization onto the TOD

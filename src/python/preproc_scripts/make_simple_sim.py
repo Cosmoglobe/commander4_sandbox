@@ -21,8 +21,8 @@ import camb
 from camb import model, initialpower
 
 
-nside = 256
-lmax = 6000
+nside = 2048
+lmax = 3*nside
 fwhm = 10*u.arcmin
 sigma0s = [100, 80, 30, 150, 220]
 freqs = [30, 70, 100, 217, 353]
@@ -61,8 +61,6 @@ ntod = 9*npix
 pix = np.arange(ntod) % npix
 psi = np.repeat(np.arange(9)*np.pi/9, npix)
 
-print(pix.shape)
-print(psi.shape)
 T,Q,U = ms
 d = T[pix] + Q[pix]*np.cos(2*psi) + U[pix]*np.sin(2*psi)
 ds = []
@@ -73,6 +71,7 @@ pix = pix.astype('int32')
 
 
 n_chunks = ntod // chunk_size
+print(f'Number of scans is {n_chunks}')
 
 
 
