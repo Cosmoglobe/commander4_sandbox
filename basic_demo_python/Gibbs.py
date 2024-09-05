@@ -16,10 +16,10 @@ nthreads = 20
 
 # Some global variables - should be read from a parameter file.
 FWHM    = 0.16666*np.pi/180.0*np.ones(5)
-NSIDE   = 512
+NSIDE   = 256
 LMAX = 3*NSIDE-1
 NTOD = 2**16
-NSCAN = 432
+NSCAN = 108
 VERBOSE = False
 
 ell = np.arange(LMAX+1)
@@ -158,6 +158,7 @@ class Gibbs:
             maxiter = 21
         else:
             maxiter = 101
+        maxiter = 251
         iter = 0
         while CG_solver.err > err_tol:
             CG_solver.step()
@@ -301,7 +302,7 @@ class Gibbs:
             # **********************
             # Make frequency maps
             t0 = time.time()
-            self.tod_mapmaker_purepython()
+            self.tod_mapmaker()
             print(f">Mapmaker finished in {time.time()-t0:.2f}s.")
             # Write maps to file.
             for iband in range(self.nband):
@@ -309,6 +310,7 @@ class Gibbs:
                         overwrite=True, dtype=np.float64)
                 hp.write_map(f'output/rms_band_{iband:02}_c{iter:06}.fits', self.map_rms[iband],
                         overwrite=True, dtype=np.float64)
+            '''
             t0 = time.time()
             self.tod_mapmaker_iqu_purepython()
             print(f">IQU Mapmaker finished in {time.time()-t0:.2f}s.")
@@ -318,6 +320,7 @@ class Gibbs:
                         overwrite=True, dtype=np.float64)
                 hp.write_map(f'output/rms_IQU_band_{iband:02}_c{iter:06}.fits', self.rms_IQU[iband],
                         overwrite=True, dtype=np.float64)
+            '''
 
             # **********************
             # COMPSEP stage
@@ -360,7 +363,7 @@ if __name__ == "__main__":
     except FileExistsError:
         pass
     np.random.seed(128)
-    ngibbs = 250
+    ngibbs = 5
     gibbs = Gibbs()
     gibbs.read_tod_from_file('../src/python/preproc_scripts/tod_example.h5', ['030', '070', '100', '217', '353'])
     gibbs.solve(ngibbs)

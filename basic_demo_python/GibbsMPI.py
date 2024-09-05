@@ -170,12 +170,14 @@ class Gibbs:
         while CG_solver.err > err_tol:
             CG_solver.step()
             iter += 1
-            if VERBOSE and iter%10 == 1:
+            if VERBOSE and iter%10 == 1 and self.rank == 0:
                 print(f"Rank {self.rank:3d} CG iter {iter:3d} - Residual {CG_solver.err:.3e}")
             if iter >= maxiter:
-                print(f"Warning: Maximum number of iterations ({maxiter}) reached in CG.")
+                if self.rank == 0:
+                    print(f"Warning: Maximum number of iterations ({maxiter}) reached in CG.")
                 break
-        print(f"CG finished after {iter} iterations with a residual of {CG_solver.err:.3e} (err tol = {err_tol})")
+        if self.rank == 0:
+            print(f"CG finished after {iter} iterations with a residual of {CG_solver.err:.3e} (err tol = {err_tol})")
         s_bestfit = CG_solver.x
 
         return s_bestfit
@@ -244,13 +246,15 @@ class Gibbs:
     def solve(self, niter):
         for iter in range(1, niter+1):
             if self.rank == 0:
+                t0_Gibbs = time.time()
                 print(f'#### Gibbs iter = {iter} of {ngibbs} ####')
 
             # **********************
             # TOD stage
             # **********************
             # Estimate white noise rms per scan
-            t0 = time.time()
+            if self.rank == 0:
+                t0 = time.time()
             self.tod_signalsubtracted = self.tod - self.tod_signal_sample
             self.tod_estimate_sigma0()
             self.comm.Barrier()
@@ -263,7 +267,8 @@ class Gibbs:
             # Mapmaking stage
             # **********************
             # Make frequency maps
-            t0 = time.time()
+            if self.rank == 0:
+                t0 = time.time()
             self.tod_mapmaker()
             self.comm.Barrier()
             if self.rank == 0:
@@ -277,7 +282,8 @@ class Gibbs:
             # **********************
             # COMPSEP stage
             # **********************
-            t0 = time.time()
+            if self.rank == 0:
+                t0 = time.time()
             # Compute RHS of comp-sep equation
             compsep_RHS_eqn_mean = self.get_RHS_eqn_mean()
             compsep_RHS_eqn_fluct = self.get_RHS_eqn_fluct()
@@ -291,7 +297,8 @@ class Gibbs:
             if self.rank == 0:
                 print(f" > CompSep finished in {time.time()-t0:.2f}s.")
             # Re-project the sky realization onto the TOD
-            t0 = time.time()
+            if self.rank == 0:
+                t0 = time.time()
             self.map2tod()
             self.comm.Barrier()
             if self.rank == 0:
@@ -300,7 +307,8 @@ class Gibbs:
             # **********************
             # C(ell) sampling
             # **********************
-            t0 = time.time()
+            if self.rank == 0:
+                t0 = time.time()
             self.sample_Cl()
             self.comm.Barrier()
             if self.rank == 0:
@@ -313,6 +321,7 @@ class Gibbs:
                 hp.write_map(f'output/mapy_c{iter:06}.fits', self.map_signal_fluct,
                         overwrite=True, dtype=np.float64)
                 np.save(f"output/Cl_sample_c{iter:06}.npy", self.Cl_sample)
+                print(f">>Gibbs iteration finished in {time.time()-t0_Gibbs:.2f}s.")
 
 
 if __name__ == "__main__":
