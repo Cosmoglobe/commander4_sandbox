@@ -21,10 +21,10 @@ import camb
 from camb import model, initialpower
 
 
-nside = 256
-lmax = 6000
+nside = 512
+lmax = 3*nside
 fwhm = 10*u.arcmin
-sigma0s = [100, 80, 30, 150, 220]
+sigma0s = np.array([100, 80, 30, 150, 220])/1e3
 freqs = [30, 70, 100, 217, 353]
 
 
@@ -37,31 +37,42 @@ totCL=powers['total']
 
 ell = np.arange(lmax+1)
 Cl = totCL[ell,0]
+Cl_EE = totCL[ell,1]
+Cl_BB = totCL[ell,2]
+Cl_TE = totCL[ell,3]
+
+Cls = np.array([Cl, Cl_EE, Cl_BB, Cl_TE])
+
+
 
 
 chunk_size = 2**16
 
 np.random.seed(0)
-m = hp.synfast(Cl, nside, lmax=lmax) #, fwhm = fwhm.to('rad').value)
-hp.write_map("true_sky.fits", m, overwrite=True)
+alms = hp.synalm(Cls, lmax=3*nside-1, new=True)
+ms   = hp.alm2map(alms, nside, pixwin=False)
+hp.write_map("true_sky.fits", ms, overwrite=True)
 
-m = hp.smoothing(m, fwhm=fwhm.to('rad').value)
+ms = hp.smoothing(ms, fwhm=fwhm.to('rad').value)
 
 npix = 12*nside**2
 
 ntod = 9*npix
 
 pix = np.arange(ntod) % npix
-d = m[pix]
+psi = np.repeat(np.arange(9)*np.pi/9, npix)
+
+T,Q,U = ms
+d = T[pix] + Q[pix]*np.cos(2*psi) + U[pix]*np.sin(2*psi)
 ds = []
 for i in range(len(freqs)):
     ds.append((d + np.random.randn(ntod)*sigma0s[i]).astype('float32'))
 
-d = d.astype('float32')
 pix = pix.astype('int32')
 
 
 n_chunks = ntod // chunk_size
+print(f'Number of scans is {n_chunks}')
 
 
 
@@ -90,9 +101,11 @@ for pid in range(n_chunks):
 
         tod_chunk_i = ds[i][pid*chunk_size : (pid+1)*chunk_size]
         pix_chunk_i =   pix[pid*chunk_size : (pid+1)*chunk_size]
+        psi_chunk_i =   psi[pid*chunk_size : (pid+1)*chunk_size]
         
         comm_tod.add_field(pid_data_group + "/tod", tod_chunk_i)
         comm_tod.add_field(pid_data_group + "/pix", pix_chunk_i)
+        comm_tod.add_field(pid_data_group + "/psi", psi_chunk_i)
     comm_tod.finalize_chunk(pid+1)
 
 if (ntod//chunk_size != ntod/chunk_size):
@@ -104,9 +117,11 @@ if (ntod//chunk_size != ntod/chunk_size):
     
         tod_chunk_i = ds[i][pid*chunk_size : ]
         pix_chunk_i = pix[pid*chunk_size : ]
+        psi_chunk_i = psi[pid*chunk_size : ]
         comm_tod.add_field(pid_common_group + "/ntod", [len(tod_chunk_i)])
         comm_tod.add_field(pid_data_group + "/tod", tod_chunk_i)
         comm_tod.add_field(pid_data_group + "/pix", pix_chunk_i)
+        comm_tod.add_field(pid_data_group + "/psi", psi_chunk_i)
     comm_tod.finalize_chunk(pid+1)
 
 
