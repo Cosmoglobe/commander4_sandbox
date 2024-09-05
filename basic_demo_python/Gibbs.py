@@ -74,7 +74,8 @@ class Gibbs:
         self.Ninv_flat    = np.zeros((6, self.npix))
         self.binmap       = np.zeros((3, self.npix))
         self.map_IQU      = np.zeros((self.nband, 3, self.npix))
-        self.rms_IQU      = np.zeros((self.nband, 3, self.npix))
+        self.rms_IQU      = np.zeros((self.nband, 6, self.npix))
+        self.map_inv_var_IQU = np.zeros((self.nband, 6, self.npix))
 
 
     def read_tod_from_file(self, h5_filename, bands):
@@ -89,6 +90,8 @@ class Gibbs:
                     self.tod[iband, iscan] = f[f'{iscan+1:06}/{bands[iband]}/tod'][:self.ntod]
                     self.pix[iband, iscan] = f[f'{iscan+1:06}/{bands[iband]}/pix'][:self.ntod]
                     self.psi[iband, iscan] = f[f'{iscan+1:06}/{bands[iband]}/psi'][:self.ntod]
+        self.cos2psi = np.cos(2*self.psi)
+        self.sin2psi = np.sin(2*self.psi)
 
 
     def LHS_func(self, x):
@@ -238,6 +241,9 @@ class Gibbs:
             self.rms_IQU[iband,0] = np.sqrt(A/det)
             self.rms_IQU[iband,1] = np.sqrt(E/det)
             self.rms_IQU[iband,2] = np.sqrt(I/det)
+            self.rms_IQU[iband,3] = B/det
+            self.rms_IQU[iband,4] = C/det
+            self.rms_IQU[iband,5] = F/det
         ipix_mask = hp.query_disc(self.nside, (10,0,0), np.radians(60))  # Quick way of simulating a "mask", aka a region of infinite rms.
         self.rms_IQU[:,:,ipix_mask] = np.inf
 
@@ -257,6 +263,21 @@ class Gibbs:
         self.map_rms = 1.0/np.sqrt(self.map_inv_var)
         ipix_mask = hp.query_disc(self.nside, (10,0,0), np.radians(60))  # Quick way of simulating a "mask", aka a region of infinite rms.
         self.map_rms[:,ipix_mask] = np.inf
+
+    def tod_mapmaker_IQU(self):
+        self.map_IQU[:] = 0.
+        self.rms_IQU[:] = 0.
+        self.map_inv_var_IQU[:] = 0.
+        maplib = ct.cdll.LoadLibrary(current_dir_path + "/mapmaker.so")
+        ct_i64_dim2 = np.ctypeslib.ndpointer(dtype=ct.c_int64, ndim=2, flags="contiguous")
+        ct_f64_dim1 = np.ctypeslib.ndpointer(dtype=ct.c_double, ndim=1, flags="contiguous")
+        ct_f64_dim2 = np.ctypeslib.ndpointer(dtype=ct.c_double, ndim=2, flags="contiguous")
+        maplib.mapmaker_IQU.argtypes = [ct_f64_dim2, ct_f64_dim2, ct_f64_dim2, ct_i64_dim2, ct_f64_dim2, ct_f64_dim2, ct_f64_dim1, ct.c_int64, ct.c_int64, ct.c_int64]
+        for iband in range(self.nband):
+            maplib.mapmaker_IQU(self.map_IQU[iband], self.map_inv_var_IQU[iband], self.tod[iband], self.pix[iband], self.cos2psi[iband], self.sin2psi[iband], self.sigma0_est[iband], self.ntod, self.nscan, self.npix)
+        self.rms_IQU = np.sqrt(self.map_inv_var_IQU[:,:3,:])
+        ipix_mask = hp.query_disc(self.nside, (10,0,0), np.radians(60))  # Quick way of simulating a "mask", aka a region of infinite rms.
+        self.rms_IQU[:,:,ipix_mask] = np.inf
 
 
     def map2tod(self):
@@ -310,9 +331,9 @@ class Gibbs:
                         overwrite=True, dtype=np.float64)
                 hp.write_map(f'output/rms_band_{iband:02}_c{iter:06}.fits', self.map_rms[iband],
                         overwrite=True, dtype=np.float64)
-            '''
+
             t0 = time.time()
-            self.tod_mapmaker_iqu_purepython()
+            self.tod_mapmaker_IQU()
             print(f">IQU Mapmaker finished in {time.time()-t0:.2f}s.")
             # Write maps to file.
             for iband in range(self.nband):
@@ -320,7 +341,6 @@ class Gibbs:
                         overwrite=True, dtype=np.float64)
                 hp.write_map(f'output/rms_IQU_band_{iband:02}_c{iter:06}.fits', self.rms_IQU[iband],
                         overwrite=True, dtype=np.float64)
-            '''
 
             # **********************
             # COMPSEP stage
