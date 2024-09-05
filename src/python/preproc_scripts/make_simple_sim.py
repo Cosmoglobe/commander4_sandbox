@@ -21,7 +21,7 @@ import camb
 from camb import model, initialpower
 
 
-nside = 512
+nside = 256
 lmax = 3*nside
 fwhm = 10*u.arcmin
 sigma0s = np.array([100, 80, 30, 150, 220])/1e3
