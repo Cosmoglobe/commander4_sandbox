@@ -225,7 +225,7 @@ class commander_tod:
                 self.add_field(encoding, [self.encodings[encoding]])
                 #print('adding ' + encoding + ' to file ' + self.outName)
 
-            self.add_field('/common/version', np.string_(self.version))
+            self.add_field('/common/version', np.bytes_(self.version))
             # [Maksym]: was getting the error:
             # ...
             # File ".../python/commander_tools/tod_tools/commander_tod.py", line 213, in finaliz    e_file
@@ -237,8 +237,8 @@ class commander_tod:
             # File "h5py/h5t.pyx", line 1653, in h5py.h5t.py_create
             # File "h5py/h5t.pyx", line 1719, in h5py.h5t.py_create
             # TypeError: No conversion path for dtype: dtype('<U6')
-            # So needed to add `np.string_()`
-            self.add_field('/common/pids', np.string_(list(self.pids.keys())))
+            # So needed to add `np.bytes_()`
+            self.add_field('/common/pids', np.bytes_(list(self.pids.keys())))
 
         if self.filelists is not None:
             for pid in self.pids.keys():
