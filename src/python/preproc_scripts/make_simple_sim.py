@@ -64,12 +64,11 @@ dust = pysm3.Sky(nside=nside, preset_strings=["d1"])
 dust_857 = dust.get_emission(nu_dust*u.GHz)
 dust_857 = dust_857.to(u.MJy/u.sr, equivalencies=u.cmb_equivalencies(857*u.GHz))
 
-hp.write_map(f"true_sky_dust857_{nside}.fits", dust_857, overwrite=True)
 
 dust_857_s = hp.smoothing(dust_857, fwhm=fwhm.to('rad').value)*dust_857.unit
 
 beta = 1.5
-T    = 20
+T = 20
 
 
 
@@ -101,6 +100,9 @@ for i in range(len(freqs)):
     d = I[pix] + Q[pix]*np.cos(2*psi) + U[pix]*np.sin(2*psi)
     d = d.to(u.uK_CMB, equivalencies=u.cmb_equivalencies(freqs[i]*u.GHz))
     ds.append((d + np.random.randn(ntod)*sigma0s[i]).astype('float32').value)
+
+dust_857 = dust_857.to(u.uK_CMB, equivalencies=u.cmb_equivalencies(857*u.GHz))
+hp.write_map(f"true_sky_dust857_{nside}.fits", dust_857, overwrite=True)
 
 pix = pix.astype('int32')
 

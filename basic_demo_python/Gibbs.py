@@ -320,6 +320,12 @@ class Gibbs:
             for iband in range(self.nband):
                 np.save(f"output/sigma0_est_band_{iband:02}_c{iter:06}.npy", self.sigma0_est)
 
+
+            # Fixing sigma0
+            sigma0_true = np.array([100, 80, 30, 150, 220])
+            for iband in range(self.nband):
+                self.sigma0_est[iband,:] = sigma0_true[iband]
+
             # **********************
             # Mapmaking stage
             # **********************
