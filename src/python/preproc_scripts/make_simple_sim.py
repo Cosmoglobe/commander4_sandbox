@@ -13,12 +13,22 @@
 
 import numpy as np
 import healpy as hp
-import astropy.units as u
+import pysm3
+import pysm3.units as u
 from commander_tod import commander_tod
 import matplotlib.pyplot as plt
 
 import camb
 from camb import model, initialpower
+
+from astropy.modeling.physical_models import BlackBody
+
+
+def mixmat(nu, nu_0, beta, T):
+    bb = BlackBody(temperature=T*u.K)
+    M = (nu/nu_0)**beta
+    M *= bb(nu*u.GHz)/bb(nu_0*u.GHz)
+    return M
 
 
 nside = 256#8192#256
@@ -27,8 +37,9 @@ fwhm_arcmin = 20
 fwhm = fwhm_arcmin*u.arcmin
 sigma_fac = 1.0
 
-sigma0s = np.array([100, 80, 30, 150, 220])*sigma_fac
-freqs = [30, 70, 100, 217, 353]
+sigma0s = np.array([100, 80, 30, 150, 220])*sigma_fac*u.uK_CMB
+freqs = np.array([30, 70, 100, 217, 353])
+
 
 
 pars = camb.set_params(H0=67.5, ombh2=0.022, omch2=0.122, mnu=0.06, omk=0, tau=0.06,
@@ -47,16 +58,32 @@ Cl_TE = totCL[ell,3]
 Cls = np.array([Cl, Cl_EE, Cl_BB, Cl_TE])
 
 
+nu_dust = 857
+
+dust = pysm3.Sky(nside=nside, preset_strings=["d1"])
+dust_857 = dust.get_emission(nu_dust*u.GHz)
+dust_857 = dust_857.to(u.MJy/u.sr, equivalencies=u.cmb_equivalencies(857*u.GHz))
+
+hp.write_map(f"true_sky_dust857_{nside}.fits", dust_857, overwrite=True)
+
+dust_857_s = hp.smoothing(dust_857, fwhm=fwhm.to('rad').value)*dust_857.unit
+
+beta = 1.5
+T    = 20
+
+
 
 
 chunk_size = 2**16
 
 np.random.seed(0)
 alms = hp.synalm(Cls, lmax=3*nside-1, new=True)
-ms   = hp.alm2map(alms, nside, pixwin=False)
-hp.write_map(f"true_sky_{nside}.fits", ms, overwrite=True)
+cmb   = hp.alm2map(alms, nside, pixwin=False)
+hp.write_map(f"true_sky_cmb_{nside}.fits", cmb, overwrite=True)
 
-ms = hp.smoothing(ms, fwhm=fwhm.to('rad').value)
+cmb_s = hp.smoothing(cmb, fwhm=fwhm.to('rad').value)
+
+cmb_s = cmb_s * u.uK_CMB
 
 npix = 12*nside**2
 
@@ -65,11 +92,15 @@ ntod = 9*npix
 pix = np.arange(ntod) % npix
 psi = np.repeat(np.arange(9)*np.pi/9, npix)
 
-T,Q,U = ms
-d = T[pix] + Q[pix]*np.cos(2*psi) + U[pix]*np.sin(2*psi)
 ds = []
 for i in range(len(freqs)):
-    ds.append((d + np.random.randn(ntod)*sigma0s[i]).astype('float32'))
+    cmb_freq = cmb_s.to(u.MJy/u.sr, equivalencies=u.cmb_equivalencies(freqs[i]*u.GHz))
+    M = mixmat(freqs[i], nu_dust, beta, T)
+    m_s = cmb_freq + dust_857_s * M
+    I,Q,U = m_s
+    d = I[pix] + Q[pix]*np.cos(2*psi) + U[pix]*np.sin(2*psi)
+    d = d.to(u.uK_CMB, equivalencies=u.cmb_equivalencies(freqs[i]*u.GHz))
+    ds.append((d + np.random.randn(ntod)*sigma0s[i]).astype('float32').value)
 
 pix = pix.astype('int32')
 
@@ -83,7 +114,7 @@ output_path = '.'
 version = 'hello'
 comm_tod = commander_tod(output_path, "", version, overwrite=True)
 
-hdf_filename = f'tod_example_{nside}_s{sigma_fac}_b{fwhm_arcmin}'
+hdf_filename = f'tod_example_{nside}_s{sigma_fac}_b{fwhm_arcmin}_dust'
 
 COMMON_GROUP = "/common"
 HUFFMAN_COMPRESSION = ["huffman", {"dictNum": 1}]

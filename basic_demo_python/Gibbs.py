@@ -191,6 +191,7 @@ class Gibbs:
         self.map_sky[:] = 0.0
         self.map_inv_var[:] = 0.0
         self.map_rms[:] = 0.0
+
         for iband in range(self.nband):
             for iscan in range(self.nscan):
                 self.map_sky[iband] += np.bincount(self.pix[iband,iscan], weights=self.tod[iband,iscan]/self.sigma0_est[iband,iscan]**2, minlength=self.npix)
@@ -344,6 +345,7 @@ class Gibbs:
                         overwrite=True, dtype=np.float64)
 
 
+            '''
             # **********************
             # COMPSEP stage
             # **********************
@@ -378,6 +380,7 @@ class Gibbs:
             np.save(f"output/Cl_sample_c{iter:06}.npy", self.Cl_sample)
 
             print(f">>Gibbs iteration finished in {time.time()-t0_Gibbs:.2f}s.")
+            '''
 
 if __name__ == "__main__":
     try:
@@ -387,5 +390,5 @@ if __name__ == "__main__":
     np.random.seed(128)
     ngibbs = 5
     gibbs = Gibbs()
-    gibbs.read_tod_from_file('../src/python/preproc_scripts/tod_example.h5', ['030', '070', '100', '217', '353'])
+    gibbs.read_tod_from_file('../src/python/preproc_scripts/tod_example_256_s1.0_b20_dust.h5', ['030', '070', '100', '217', '353'])
     gibbs.solve(ngibbs)
