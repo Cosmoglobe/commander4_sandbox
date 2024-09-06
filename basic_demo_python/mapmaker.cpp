@@ -109,7 +109,7 @@ void mapmaker_IQU(double *map, double *map_inv_var, double *tod, int64_t *pix, d
         }
         for(int64_t itod=0; itod<scan_len; itod++){
             int64_t idx = iscan*scan_len + itod;
-	    map[pix[idx] +   2*num_pix] += tod[idx]*scan_inv_var*cos2psi[idx];
+	    map[pix[idx] +   2*num_pix] += tod[idx]*scan_inv_var*sin2psi[idx];
             map_inv_var[pix[idx] +   2*num_pix] += scan_inv_var*sin2psi[idx];
         }
         for(int64_t itod=0; itod<scan_len; itod++){

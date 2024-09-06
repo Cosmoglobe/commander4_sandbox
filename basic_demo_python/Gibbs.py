@@ -275,7 +275,8 @@ class Gibbs:
         maplib.mapmaker_IQU.argtypes = [ct_f64_dim2, ct_f64_dim2, ct_f64_dim2, ct_i64_dim2, ct_f64_dim2, ct_f64_dim2, ct_f64_dim1, ct.c_int64, ct.c_int64, ct.c_int64]
         for iband in range(self.nband):
             maplib.mapmaker_IQU(self.map_IQU[iband], self.map_inv_var_IQU[iband], self.tod[iband], self.pix[iband], self.cos2psi[iband], self.sin2psi[iband], self.sigma0_est[iband], self.ntod, self.nscan, self.npix)
-        self.rms_IQU = np.sqrt(self.map_inv_var_IQU[:,:3,:])
+        self.rms_IQU[:,:3,:] = np.sqrt(self.map_inv_var_IQU[:,:3,:])
+        self.rms_IQU[:,3:,:] = self.map_inv_var_IQU[:,3:,:]
         ipix_mask = hp.query_disc(self.nside, (10,0,0), np.radians(60))  # Quick way of simulating a "mask", aka a region of infinite rms.
         self.rms_IQU[:,:,ipix_mask] = np.inf
 
@@ -341,6 +342,7 @@ class Gibbs:
                         overwrite=True, dtype=np.float64)
                 hp.write_map(f'output/rms_IQU_band_{iband:02}_c{iter:06}.fits', self.rms_IQU[iband],
                         overwrite=True, dtype=np.float64)
+
 
             # **********************
             # COMPSEP stage
