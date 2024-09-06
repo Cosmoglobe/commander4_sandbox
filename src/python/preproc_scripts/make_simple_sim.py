@@ -21,10 +21,13 @@ import camb
 from camb import model, initialpower
 
 
-nside = 256
-lmax = 3*nside
-fwhm = 10*u.arcmin
-sigma0s = np.array([100, 80, 30, 150, 220])/1e3
+nside = 256#8192#256
+lmax = 3*nside-1
+fwhm_arcmin = 20
+fwhm = fwhm_arcmin*u.arcmin
+sigma_fac = 1.0
+
+sigma0s = np.array([100, 80, 30, 150, 220])*sigma_fac
 freqs = [30, 70, 100, 217, 353]
 
 
@@ -51,7 +54,7 @@ chunk_size = 2**16
 np.random.seed(0)
 alms = hp.synalm(Cls, lmax=3*nside-1, new=True)
 ms   = hp.alm2map(alms, nside, pixwin=False)
-hp.write_map("true_sky.fits", ms, overwrite=True)
+hp.write_map(f"true_sky_{nside}.fits", ms, overwrite=True)
 
 ms = hp.smoothing(ms, fwhm=fwhm.to('rad').value)
 
@@ -80,7 +83,7 @@ output_path = '.'
 version = 'hello'
 comm_tod = commander_tod(output_path, "", version, overwrite=True)
 
-hdf_filename = 'tod_example'
+hdf_filename = f'tod_example_{nside}_s{sigma_fac}_b{fwhm_arcmin}'
 
 COMMON_GROUP = "/common"
 HUFFMAN_COMPRESSION = ["huffman", {"dictNum": 1}]
