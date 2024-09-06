@@ -6,8 +6,11 @@ from pixell import utils
 import time
 import ctypes as ct
 from scipy.sparse.linalg import cg, LinearOperator
+import astropy.units as u
+import astropy.constants as c
 import os
-import os 
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 current_dir_path = os.path.dirname(os.path.realpath(__file__))
 
 # number of threads that ducc0 should use. NOte that this can be varied on a
@@ -52,6 +55,24 @@ def alm2map_adjoint(map, nside, lmax):
                                        spin=0,
                                        nthreads=nthreads, **geom).reshape((-1,))
 
+A = (2*c.h*u.GHz**3/c.c**2).to('MJy').value
+h_over_k = (c.h/c.k_B/(1*u.K)).to('GHz-1').value
+h_over_kTCMB = (c.h/c.k_B/(2.7255*u.K)).to('GHz-1').value
+def blackbody(nu, T):
+    return nu**3/np.expm1(nu*h_over_k/T)
+
+def g(nu):
+    # From uK_CMB to MJy/sr
+    x = nu*h_over_kTCMB
+    return np.expm1(x)**2/(x**4*np.exp(x))
+
+def cmb_sed(freq):
+    # Assuming we are working in uK_CMB units
+    return 1
+
+def dust_sed(nu, beta, T, nu0 = 857):
+    x = nu*h_over_k/T
+    return g(nu)/g(nu0) * (nu/nu0)**beta * blackbody(nu, T)/blackbody(nu0, T)
 
 class Gibbs:
     def __init__(self):
@@ -63,6 +84,15 @@ class Gibbs:
         self.nscan  = NSCAN
         self.nband = 5
         self.fwhm = FWHM[:self.nband]
+
+        self.ncomp = 2
+        self.freqs = np.array([30,70,100,217,353])
+        self.comp_labels = ['cmb', 'dust']
+
+        self.T_d = 20
+        self.beta_d = 1.5
+
+        self.comp_maps = np.zeros((self.ncomp, self.npix))
 
         self.map_rms = np.zeros((self.nband, self.npix))
         self.map_inv_var = np.zeros((self.nband, self.npix))
@@ -118,7 +148,8 @@ class Gibbs:
         """
         RHS_sum = np.zeros(self.alm_len, dtype=np.complex128)
         for iband in range(self.nband):
-            Nd = self.map_sky[iband]/self.map_rms[iband]**2
+            res = self.map_sky[iband] - self.comp_maps[1]*dust_sed(self.freqs[iband], self.beta_d, self.T_d)
+            Nd = res/self.map_rms[iband]**2
             YTNd = alm2map_adjoint(Nd, self.nside, self.lmax)
             ATYTNd = hp.smoothalm(YTNd, self.fwhm[iband], inplace=False)
             RHS_sum += ATYTNd
@@ -143,6 +174,23 @@ class Gibbs:
             ATYTNomega1 = hp.smoothalm(YTNomega1, self.fwhm[iband], inplace=False)
             RHS_sum += ATYTNomega1
         return RHS_sum
+
+    def compsep_per_pix(self):
+        M = np.zeros((self.nband, self.ncomp))
+        M[:,0] = cmb_sed(self.freqs)
+        M[:,1] = dust_sed(self.freqs, self.beta_d, self.T_d)
+
+        RHS_sum = np.zeros((self.ncomp, self.npix)) 
+        A = np.zeros((self.ncomp, self.ncomp, self.npix))
+        for i in range(self.npix):
+            x = M.T.dot((1/self.map_rms[:,i]**2*self.map_sky[:,i]))
+            x += M.T.dot(np.random.randn(self.nband)/self.map_rms[:,i])
+            A = (M.T.dot(np.diag(1/self.map_rms[:,i]**2)).dot(M))
+            try:
+                self.comp_maps[:,i] = np.linalg.solve(A, x)
+            except np.linalg.LinAlgError:
+                self.comp_maps[:,i] = 0
+
 
 
     def compsep_compute_Ax(self, LHS, RHS, iter_no=None):
@@ -198,7 +246,7 @@ class Gibbs:
                 self.map_inv_var[iband] += np.bincount(self.pix[iband,iscan], weights=1.0/self.sigma0_est[iband,iscan]**2*np.ones(self.ntod), minlength=self.npix)
         self.map_rms = 1.0/np.sqrt(self.map_inv_var)
         self.map_sky /= self.map_inv_var
-        ipix_mask = hp.query_disc(self.nside, (10,0,0), np.radians(60))  # Quick way of simulating a "mask", aka a region of infinite rms.
+        ipix_mask = hp.query_disc(self.nside, (10,0,0), np.radians(10))  # Quick way of simulating a "mask", aka a region of infinite rms.
         self.map_rms[:,ipix_mask] = np.inf
 
     def tod_mapmaker_iqu_purepython(self):
@@ -245,7 +293,7 @@ class Gibbs:
             self.rms_IQU[iband,3] = B/det
             self.rms_IQU[iband,4] = C/det
             self.rms_IQU[iband,5] = F/det
-        ipix_mask = hp.query_disc(self.nside, (10,0,0), np.radians(60))  # Quick way of simulating a "mask", aka a region of infinite rms.
+        ipix_mask = hp.query_disc(self.nside, (10,0,0), np.radians(10))  # Quick way of simulating a "mask", aka a region of infinite rms.
         self.rms_IQU[:,:,ipix_mask] = np.inf
 
 
@@ -262,7 +310,7 @@ class Gibbs:
         for iband in range(self.nband):
             maplib.mapmaker(self.map_sky[iband], self.map_inv_var[iband], self.tod[iband], self.pix[iband], self.sigma0_est[iband], self.ntod, self.nscan, self.npix)
         self.map_rms = 1.0/np.sqrt(self.map_inv_var)
-        ipix_mask = hp.query_disc(self.nside, (10,0,0), np.radians(60))  # Quick way of simulating a "mask", aka a region of infinite rms.
+        ipix_mask = hp.query_disc(self.nside, (10,0,0), np.radians(10))  # Quick way of simulating a "mask", aka a region of infinite rms.
         self.map_rms[:,ipix_mask] = np.inf
 
     def tod_mapmaker_IQU(self):
@@ -278,7 +326,7 @@ class Gibbs:
             maplib.mapmaker_IQU(self.map_IQU[iband], self.map_inv_var_IQU[iband], self.tod[iband], self.pix[iband], self.cos2psi[iband], self.sin2psi[iband], self.sigma0_est[iband], self.ntod, self.nscan, self.npix)
         self.rms_IQU[:,:3,:] = np.sqrt(self.map_inv_var_IQU[:,:3,:])
         self.rms_IQU[:,3:,:] = self.map_inv_var_IQU[:,3:,:]
-        ipix_mask = hp.query_disc(self.nside, (10,0,0), np.radians(60))  # Quick way of simulating a "mask", aka a region of infinite rms.
+        ipix_mask = hp.query_disc(self.nside, (10,0,0), np.radians(10))  # Quick way of simulating a "mask", aka a region of infinite rms.
         self.rms_IQU[:,:,ipix_mask] = np.inf
 
 
@@ -287,7 +335,8 @@ class Gibbs:
         """
         for iband in range(self.nband):
             for iscan in range(self.nscan):
-                self.tod_signal_sample[iband,iscan] = self.map_signal_mean[self.pix[iband,iscan]] + self.map_signal_fluct[self.pix[iband,iscan]]
+                self.tod_signal_sample[iband,iscan] = self.comp_maps[0, self.pix[iband,iscan]] \
+                         + self.comp_maps[1, self.pix[iband,iscan]]*dust_sed(self.freqs[iband], self.beta_d, self.T_d)
 
 
     def sample_Cl(self):
@@ -350,8 +399,14 @@ class Gibbs:
                 hp.write_map(f'output/rms_IQU_band_{iband:02}_c{iter:06}.fits', self.rms_IQU[iband],
                         overwrite=True, dtype=np.float64)
 
+            t0 = time.time()
+            self.compsep_per_pix()
+            print(f">Amplitude sampling finished in {time.time()-t0:.2f}s.")
 
-            '''
+            for icomp in range(self.ncomp):
+                hp.write_map(f'output/comp_{self.comp_labels[icomp]}_c{iter:06}.fits', self.comp_maps[icomp], overwrite=True, dtype=np.float64)
+
+
             # **********************
             # COMPSEP stage
             # **********************
@@ -386,13 +441,13 @@ class Gibbs:
             np.save(f"output/Cl_sample_c{iter:06}.npy", self.Cl_sample)
 
             print(f">>Gibbs iteration finished in {time.time()-t0_Gibbs:.2f}s.")
-            '''
 
 if __name__ == "__main__":
     try:
         os.mkdir('output')
     except FileExistsError:
         pass
+
     np.random.seed(128)
     ngibbs = 5
     gibbs = Gibbs()
