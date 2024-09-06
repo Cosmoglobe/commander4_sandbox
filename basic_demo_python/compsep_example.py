@@ -38,9 +38,9 @@ b = np.zeros((2,npix))
 den = np.zeros((2,2,npix))
 x = np.zeros((2,npix))
 for i in tqdm(range(npix)):
-    mean = T.T.dot((1/np.ones_like(rmss[:,i]**2)*ms[:,i]))
-    fluc = T.T.dot(np.random.randn(5)/np.ones_like(rmss[:,i]))
-    den = (T.T.dot(np.diag(1/np.ones_like(rmss[:,i]**2))).dot(T))
+    mean = T.T.dot((1/rmss[:,i]**2*ms[:,i]))
+    fluc = T.T.dot(np.random.randn(5)/rmss[:,i])
+    den = (T.T.dot(np.diag(1/rmss[:,i]**2)).dot(T))
     try:
         x[:,i] = np.linalg.solve(den, mean + fluc)
     except np.linalg.LinAlgError:
