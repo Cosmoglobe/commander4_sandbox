@@ -6,10 +6,10 @@ from pixell import utils
 import time
 import ctypes as ct
 from scipy.sparse.linalg import cg, LinearOperator
-import astropy.units as u
-import astropy.constants as c
 import os
 import matplotlib.pyplot as plt
+from foregrounds import cmb_sed, dust_sed, lnlike_beta_d, lnlike_T_d
+
 from tqdm import tqdm
 current_dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -19,16 +19,17 @@ nthreads = 20
 
 # Some global variables - should be read from a parameter file.
 FWHM    = 0.16666*np.pi/180.0*np.ones(5)
+FWHM = 60*np.pi/180*np.ones(5)
 NSIDE   = 256
 LMAX = 3*NSIDE-1
 NTOD = 2**16
 NSCAN = 108
 VERBOSE = False
 
-ell = np.arange(LMAX+1)
-Cl_true = np.zeros(len(ell))
-Cl_true[2:] = 1./ell[2:]**2  # True Cl used in the "make_simple_sim.py" script.
-Cl_true[:2] = 1e-12
+NSCAN = 1200
+NSIDE = 256
+NTOD = 2**15
+LMAX = 3*NSIDE-1
 
 
 def dot_alm(alm1, alm2):
@@ -55,24 +56,36 @@ def alm2map_adjoint(map, nside, lmax):
                                        spin=0,
                                        nthreads=nthreads, **geom).reshape((-1,))
 
-A = (2*c.h*u.GHz**3/c.c**2).to('MJy').value
-h_over_k = (c.h/c.k_B/(1*u.K)).to('GHz-1').value
-h_over_kTCMB = (c.h/c.k_B/(2.7255*u.K)).to('GHz-1').value
-def blackbody(nu, T):
-    return nu**3/np.expm1(nu*h_over_k/T)
+def inversion_sampler(lnlike, data, theta_min, theta_max, num_steps, plot=False):
+    '''
+    Given a log-likelihood as a fucntion of a single variable, grids out the
+    probability from theta_min to theta_max.
 
-def g(nu):
-    # From uK_CMB to MJy/sr
-    x = nu*h_over_kTCMB
-    return np.expm1(x)**2/(x**4*np.exp(x))
+    The sample is drawn from the cumulative probability distribution. Given a draw eta ~ U(0,1), 
+    solves for theta = F^{-1}(eta).
 
-def cmb_sed(freq):
-    # Assuming we are working in uK_CMB units
-    return 1
+    data - element of Gibbs class
+    '''
+    theta_arr = np.linspace(theta_min, theta_max, num_steps)
+    ln_prob = np.zeros(num_steps)
+    for i in range(num_steps):
+        ln_prob[i] = lnlike(theta_arr[i], data)
+    ln_prob -= ln_prob.max()
 
-def dust_sed(nu, beta, T, nu0 = 857):
-    x = nu*h_over_k/T
-    return g(nu)/g(nu0) * (nu/nu0)**beta * blackbody(nu, T)/blackbody(nu0, T)
+    prob = np.exp(ln_prob)
+    F = np.cumsum(prob)/prob.sum()
+
+    eta = np.random.uniform()
+    theta_hat = theta_arr[np.argmin(abs(eta -F))]
+
+    if plot:
+        plt.plot(theta_arr, ln_prob)
+        plt.show()
+        plt.plot(theta_arr, F)
+        plt.show()
+
+    return theta_hat
+
 
 class Gibbs:
     def __init__(self):
@@ -86,11 +99,11 @@ class Gibbs:
         self.fwhm = FWHM[:self.nband]
 
         self.ncomp = 2
-        self.freqs = np.array([30,70,100,217,353])
+        self.freqs = np.array([30,100,217,353,857])
         self.comp_labels = ['cmb', 'dust']
 
-        self.T_d = 20
-        self.beta_d = 1.5
+        self.T_d = 20*np.ones(self.npix)
+        self.beta_d = 1.5*np.ones(self.npix)
 
         self.comp_maps = np.zeros((self.ncomp, self.npix))
 
@@ -176,13 +189,13 @@ class Gibbs:
         return RHS_sum
 
     def compsep_per_pix(self):
-        M = np.zeros((self.nband, self.ncomp))
-        M[:,0] = cmb_sed(self.freqs)
-        M[:,1] = dust_sed(self.freqs, self.beta_d, self.T_d)
 
         RHS_sum = np.zeros((self.ncomp, self.npix)) 
         A = np.zeros((self.ncomp, self.ncomp, self.npix))
         for i in range(self.npix):
+            M = np.zeros((self.nband, self.ncomp))
+            M[:,0] = cmb_sed(self.freqs)
+            M[:,1] = dust_sed(self.freqs, self.beta_d[i], self.T_d[i])
             x = M.T.dot((1/self.map_rms[:,i]**2*self.map_sky[:,i]))
             x += M.T.dot(np.random.randn(self.nband)/self.map_rms[:,i])
             A = (M.T.dot(np.diag(1/self.map_rms[:,i]**2)).dot(M))
@@ -191,6 +204,33 @@ class Gibbs:
             except np.linalg.LinAlgError:
                 self.comp_maps[:,i] = 0
 
+    def sample_beta_d(self):
+        if self.beta_d.std() == 0:
+            beta_min = 1.4
+            beta_max = 1.6
+        else:
+            mu = self.beta_d.mean()
+            sd = self.beta_d.std()
+            beta_min = mu - 2*sd
+            beta_max = mu + 2*sd
+        num_steps   = 50
+        for ipix in range(self.npix):
+            self.beta_d[ipix] = inversion_sampler(lnlike_beta_d, (self, ipix), \
+                    beta_min, beta_max, num_steps)
+
+    def sample_T_d(self):
+        if self.T_d.std() == 0:
+            T_min = 15
+            T_max = 25
+        else:
+            mu = self.T_d.mean()
+            sd = self.T_d.std()
+            T_min = mu - 2*sd
+            T_max = mu + 2*sd
+        num_steps   = 50
+        for ipix in range(self.npix):
+            self.T_d[ipix] = inversion_sampler(lnlike_T_d, (self, ipix), \
+                    T_min, T_max, num_steps)
 
 
     def compsep_compute_Ax(self, LHS, RHS, iter_no=None):
@@ -336,7 +376,7 @@ class Gibbs:
         for iband in range(self.nband):
             for iscan in range(self.nscan):
                 self.tod_signal_sample[iband,iscan] = self.comp_maps[0, self.pix[iband,iscan]] \
-                         + self.comp_maps[1, self.pix[iband,iscan]]*dust_sed(self.freqs[iband], self.beta_d, self.T_d)
+                         + self.comp_maps[1, self.pix[iband,iscan]]*dust_sed(self.freqs[iband], self.beta_d[self.pix[iband,iscan]], self.T_d[self.pix[iband,iscan]])
 
 
     def sample_Cl(self):
@@ -362,18 +402,21 @@ class Gibbs:
             # TOD stage
             # **********************
             # Estimate white noise rms per scan
-            t0 = time.time()
-            self.tod_signalsubtracted = self.tod - self.tod_signal_sample
-            self.tod_estimate_sigma0()
-            print(f">TOD sampling finished in {time.time()-t0:.2f}s.")
+            if niter > 10:
+                t0 = time.time()
+                self.tod_signalsubtracted = self.tod - self.tod_signal_sample
+                self.tod_estimate_sigma0()
+                print(f">TOD sampling finished in {time.time()-t0:.2f}s.")
+            else:
+                # Fixing sigma0
+                sigma0_true = np.array([100, 80, 30, 150, 220])
+                for iband in range(self.nband):
+                    self.sigma0_est[iband,:] = sigma0_true[iband]
+
             for iband in range(self.nband):
                 np.save(f"output/sigma0_est_band_{iband:02}_c{iter:06}.npy", self.sigma0_est)
 
 
-            # Fixing sigma0
-            sigma0_true = np.array([100, 80, 30, 150, 220])
-            for iband in range(self.nband):
-                self.sigma0_est[iband,:] = sigma0_true[iband]
 
             # **********************
             # Mapmaking stage
@@ -389,16 +432,9 @@ class Gibbs:
                 hp.write_map(f'output/rms_band_{iband:02}_c{iter:06}.fits', self.map_rms[iband],
                         overwrite=True, dtype=np.float64)
 
-            t0 = time.time()
-            self.tod_mapmaker_IQU()
-            print(f">IQU Mapmaker finished in {time.time()-t0:.2f}s.")
-            # Write maps to file.
-            for iband in range(self.nband):
-                hp.write_map(f'output/map_IQU_band_{iband:02}_c{iter:06}.fits', self.map_IQU[iband],
-                        overwrite=True, dtype=np.float64)
-                hp.write_map(f'output/rms_IQU_band_{iband:02}_c{iter:06}.fits', self.rms_IQU[iband],
-                        overwrite=True, dtype=np.float64)
-
+            # **********************
+            # Compsep stage
+            # **********************
             t0 = time.time()
             self.compsep_per_pix()
             print(f">Amplitude sampling finished in {time.time()-t0:.2f}s.")
@@ -406,21 +442,33 @@ class Gibbs:
             for icomp in range(self.ncomp):
                 hp.write_map(f'output/comp_{self.comp_labels[icomp]}_c{iter:06}.fits', self.comp_maps[icomp], overwrite=True, dtype=np.float64)
 
+            t0 = time.time()
+            #self.sample_beta_d()
+            #self.sample_T_d()
+
+            #hp.write_map(f'output/comp_dust_beta_c{iter:06}.fits', self.beta_d, overwrite=True, dtype=np.float64)
+            #hp.write_map(f'output/comp_dust_T_c{iter:06}.fits', self.T_d, overwrite=True, dtype=np.float64)
+
+            print(f">Spectral index sampling finished in {time.time()-t0:.2f}s.")
 
             # **********************
-            # COMPSEP stage
+            # CMB Constrained Realizations
             # **********************
+
             t0 = time.time()
-            # Compute RHS of comp-sep equation
+            # Compute RHS of CMB CR equation
             compsep_RHS_eqn_mean = self.get_RHS_eqn_mean()
             compsep_RHS_eqn_fluct = self.get_RHS_eqn_fluct()
             # Solve for best-fit map by CG
             compsep_LHS = LinearOperator(shape=((self.alm_len, self.alm_len)), matvec=self.LHS_func, dtype=np.complex128)
             self.alm_signal_mean = self.compsep_compute_Ax(compsep_LHS, compsep_RHS_eqn_mean, iter_no=iter)
             self.map_signal_mean = alm2map(self.alm_signal_mean, self.nside, self.lmax)
-            self.alm_signal_fluct = self.compsep_compute_Ax(compsep_LHS, compsep_RHS_eqn_fluct, iter_no=iter)
+            if iter < 10:
+                self.alm_signal_fluct = np.zeros_like(self.alm_signal_mean)
+            else:
+                self.alm_signal_fluct = self.compsep_compute_Ax(compsep_LHS, compsep_RHS_eqn_fluct, iter_no=iter)
             self.map_signal_fluct = alm2map(self.alm_signal_fluct, self.nside, self.lmax)
-            print(f">CompSep finished in {time.time()-t0:.2f}s.")
+            print(f">CR finished in {time.time()-t0:.2f}s.")
             # Re-project the sky realization onto the TOD
             t0 = time.time()
             self.map2tod()
@@ -449,7 +497,8 @@ if __name__ == "__main__":
         pass
 
     np.random.seed(128)
-    ngibbs = 5
+    ngibbs = 250
     gibbs = Gibbs()
-    gibbs.read_tod_from_file('../src/python/preproc_scripts/tod_example_256_s1.0_b20_dust.h5', ['030', '070', '100', '217', '353'])
+    #gibbs.read_tod_from_file('../src/python/preproc_scripts/tod_example_256_s1.0_b20_dust.h5', ['0030', '0100', '0217', '0857', '1200'])
+    gibbs.read_tod_from_file('../src/python/preproc_scripts/tod_example_256_s1.0_b20_dust.h5', ['0030', '0100', '0217', '0353', '0857'])
     gibbs.solve(ngibbs)

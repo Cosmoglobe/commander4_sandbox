@@ -31,14 +31,14 @@ def mixmat(nu, nu_0, beta, T):
     return M
 
 
-nside = 256#8192#256
+nside = 256 #8192#256
 lmax = 3*nside-1
 fwhm_arcmin = 20
 fwhm = fwhm_arcmin*u.arcmin
 sigma_fac = 1.0
 
-sigma0s = np.array([100, 80, 30, 150, 220])*sigma_fac*u.uK_CMB
-freqs = np.array([30, 70, 100, 217, 353])
+sigma0s = np.array([100, 80, 30, 100, 200])*sigma_fac*u.uK_CMB/10
+freqs = np.array([30, 100, 217, 353, 857])
 
 
 
@@ -60,12 +60,14 @@ Cls = np.array([Cl, Cl_EE, Cl_BB, Cl_TE])
 
 nu_dust = 857
 
-dust = pysm3.Sky(nside=nside, preset_strings=["d1"])
+dust = pysm3.Sky(nside=1024, preset_strings=["d1"])
 dust_857 = dust.get_emission(nu_dust*u.GHz)
-dust_857 = dust_857.to(u.MJy/u.sr, equivalencies=u.cmb_equivalencies(857*u.GHz))
+dust_857_s = pysm3.apply_smoothing_and_coord_transform(dust_857, fwhm=fwhm)
+dust_857_s = dust_857_s.to(u.MJy/u.sr, equivalencies=u.cmb_equivalencies(857*u.GHz))
+dust_857_s = hp.ud_grade(dust_857_s.value, nside)*dust_857_s.unit
 
 
-dust_857_s = hp.smoothing(dust_857, fwhm=fwhm.to('rad').value)*dust_857.unit
+#dust_857_s = hp.smoothing(dust_857, fwhm=fwhm.to('rad').value)*dust_857.unit
 
 beta = 1.5
 T = 20
@@ -73,7 +75,7 @@ T = 20
 
 
 
-chunk_size = 2**16
+chunk_size = 2**15
 
 np.random.seed(0)
 alms = hp.synalm(Cls, lmax=3*nside-1, new=True)
@@ -86,10 +88,11 @@ cmb_s = cmb_s * u.uK_CMB
 
 npix = 12*nside**2
 
-ntod = 9*npix
+repeat = 50
+ntod = repeat*npix
 
 pix = np.arange(ntod) % npix
-psi = np.repeat(np.arange(9)*np.pi/9, npix)
+psi = np.repeat(np.arange(repeat)*np.pi/repeat, npix)
 
 ds = []
 for i in range(len(freqs)):
@@ -101,8 +104,7 @@ for i in range(len(freqs)):
     d = d.to(u.uK_CMB, equivalencies=u.cmb_equivalencies(freqs[i]*u.GHz))
     ds.append((d + np.random.randn(ntod)*sigma0s[i]).astype('float32').value)
 
-dust_857 = dust_857.to(u.uK_CMB, equivalencies=u.cmb_equivalencies(857*u.GHz))
-hp.write_map(f"true_sky_dust857_{nside}.fits", dust_857, overwrite=True)
+hp.write_map(f"true_sky_dust857_s_{nside}.fits", dust_857_s, overwrite=True)
 
 pix = pix.astype('int32')
 
@@ -130,7 +132,7 @@ for pid in range(n_chunks):
     pid_label = f'{pid+1:06}'
     pid_common_group = pid_label + "/common"
     for i, freq in enumerate(freqs):
-        pid_data_group = f'{pid_label}/{freq:03}'
+        pid_data_group = f'{pid_label}/{freq:04}'
 
         comm_tod.add_field(pid_common_group + "/ntod", [chunk_size])
 
@@ -138,7 +140,7 @@ for pid in range(n_chunks):
         tod_chunk_i = ds[i][pid*chunk_size : (pid+1)*chunk_size]
         pix_chunk_i =   pix[pid*chunk_size : (pid+1)*chunk_size]
         psi_chunk_i =   psi[pid*chunk_size : (pid+1)*chunk_size]
-        
+
         comm_tod.add_field(pid_data_group + "/tod", tod_chunk_i)
         comm_tod.add_field(pid_data_group + "/pix", pix_chunk_i)
         comm_tod.add_field(pid_data_group + "/psi", psi_chunk_i)
@@ -149,7 +151,7 @@ if (ntod//chunk_size != ntod/chunk_size):
     pid_label = f'{pid+1:06}'
     pid_common_group = pid_label + "/common"
     for i, freq in enumerate(freqs):
-        pid_data_group = f'{pid_label}/{freq:03}'
+        pid_data_group = f'{pid_label}/{freq:04}'
     
         tod_chunk_i = ds[i][pid*chunk_size : ]
         pix_chunk_i = pix[pid*chunk_size : ]

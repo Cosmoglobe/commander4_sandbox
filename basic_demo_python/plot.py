@@ -4,6 +4,7 @@ import numpy as np
 import os
 import tqdm
 import camb
+import cosmoglobe as cg
 
 try:
     os.mkdir('plots')
@@ -14,11 +15,8 @@ NSIDE   = 256
 NPIX = 12*NSIDE**2
 LMAX = 3*NSIDE-1
 
-iband = 0
 
-maptrue = hp.read_map(f"../src/python/preproc_scripts/true_sky.fits")
-hp.mollview(maptrue, title=f"True sky map", min=-250, max=250, cmap="RdBu_r")
-plt.savefig(f"plots/maptrue.png")
+iband = 0
 
 map_sky = hp.read_map(f"output/map_band_{iband:02}_c000001.fits")
 hp.mollview(map_sky, title=f"Observed sky", min=-250, max=250, cmap="RdBu_r")
@@ -40,6 +38,18 @@ Dl = totCL[ell,0]
 for iter in tqdm.tqdm(range(1, 1000)):
     if os.path.exists(f"plots/Cl_iter{iter:06}.png"):
         continue
+
+    cg.plot(f'output/comp_dust_c{iter:06}.fits', norm='log', min=75e3, max=1e9, cmap='afmhot')
+    plt.savefig(f'plots/comp_dust_c{iter:06}.png')
+    cg.plot(f'output/comp_cmb_c{iter:06}.fits', min=-250, max=250)
+    plt.savefig(f'plots/comp_cmb_c{iter:06}.png')
+
+    cg.plot(f'output/comp_dust_beta_c{iter:06}.fits', min=1.4, max=1.6)
+    plt.savefig(f'plots/comp_dust_beta_c{iter:06}.png')
+    cg.plot(f'output/comp_dust_T_c{iter:06}.fits', min=17, max=23)
+    plt.savefig(f'plots/comp_dust_T_c{iter:06}.png')
+
+    # CMB Constrained Realizations
     mapx = hp.read_map(f"output/mapx_c{iter:06}.fits") 
     hp.mollview(mapx, title=f"mean field map, iter {iter}", min=-250, max=250, cmap="RdBu_r")
     plt.savefig(f"plots/mapx_iter{iter:06}.png")
