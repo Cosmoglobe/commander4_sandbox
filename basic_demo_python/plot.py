@@ -4,14 +4,14 @@ import numpy as np
 import os
 import tqdm
 import camb
-import cosmoglobe as cg
+#import cosmoglobe as cg
 
 try:
     os.mkdir('plots')
 except FileExistsError:
     pass
 
-NSIDE   = 256
+NSIDE   = 64
 NPIX = 12*NSIDE**2
 LMAX = 3*NSIDE-1
 
@@ -39,15 +39,21 @@ for iter in tqdm.tqdm(range(1, 1000)):
     if os.path.exists(f"plots/Cl_iter{iter:06}.png"):
         continue
 
-    cg.plot(f'output/comp_dust_c{iter:06}.fits', norm='log', min=75e3, max=1e9, cmap='afmhot')
+    m = hp.read_map(f'output/comp_dust_c{iter:06}.fits')
+    hp.mollview(m, norm='log', min=75e3, max=1e9, cmap='afmhot')
     plt.savefig(f'plots/comp_dust_c{iter:06}.png')
-    cg.plot(f'output/comp_cmb_c{iter:06}.fits', min=-250, max=250)
+    m = hp.read_map(f'output/comp_cmb_c{iter:06}.fits')
+    hp.mollview(m, min=-250, max=250, cmap='RdBu_r')
     plt.savefig(f'plots/comp_cmb_c{iter:06}.png')
 
-    cg.plot(f'output/comp_dust_beta_c{iter:06}.fits', min=1.4, max=1.6)
+    
+    m = hp.read_map(f'output/comp_dust_beta_c{iter:06}.fits')
+    hp.mollview(m, min=1.4, max=1.6)
     plt.savefig(f'plots/comp_dust_beta_c{iter:06}.png')
-    cg.plot(f'output/comp_dust_T_c{iter:06}.fits', min=17, max=23)
+    m = hp.read_map(f'output/comp_dust_T_c{iter:06}.fits')
+    hp.mollview(m, min=17, max=23)
     plt.savefig(f'plots/comp_dust_T_c{iter:06}.png')
+   
 
     # CMB Constrained Realizations
     mapx = hp.read_map(f"output/mapx_c{iter:06}.fits") 

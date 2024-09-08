@@ -31,7 +31,7 @@ def mixmat(nu, nu_0, beta, T):
     return M
 
 
-nside = 256 #8192#256
+nside = 64 #8192#256
 lmax = 3*nside-1
 fwhm_arcmin = 20
 fwhm = fwhm_arcmin*u.arcmin

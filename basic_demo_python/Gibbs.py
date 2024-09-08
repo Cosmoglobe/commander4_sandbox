@@ -18,18 +18,13 @@ current_dir_path = os.path.dirname(os.path.realpath(__file__))
 nthreads = 20
 
 # Some global variables - should be read from a parameter file.
-FWHM    = 0.16666*np.pi/180.0*np.ones(5)
-FWHM = 60*np.pi/180*np.ones(5)
-NSIDE   = 256
+fwhm_arcmin = 20
+FWHM = fwhm_arcmin/60*np.pi/180*np.ones(5)
+NSIDE = 64
 LMAX = 3*NSIDE-1
-NTOD = 2**16
-NSCAN = 108
-VERBOSE = False
-
-NSCAN = 1200
-NSIDE = 256
 NTOD = 2**15
-LMAX = 3*NSIDE-1
+NSCAN = 75
+VERBOSE = False
 
 
 def dot_alm(alm1, alm2):
@@ -214,7 +209,7 @@ class Gibbs:
             beta_min = mu - 2*sd
             beta_max = mu + 2*sd
         num_steps   = 50
-        for ipix in range(self.npix):
+        for ipix in tqdm(range(self.npix)):
             self.beta_d[ipix] = inversion_sampler(lnlike_beta_d, (self, ipix), \
                     beta_min, beta_max, num_steps)
 
@@ -228,7 +223,7 @@ class Gibbs:
             T_min = mu - 2*sd
             T_max = mu + 2*sd
         num_steps   = 50
-        for ipix in range(self.npix):
+        for ipix in tqdm(range(self.npix)):
             self.T_d[ipix] = inversion_sampler(lnlike_T_d, (self, ipix), \
                     T_min, T_max, num_steps)
 
@@ -402,7 +397,7 @@ class Gibbs:
             # TOD stage
             # **********************
             # Estimate white noise rms per scan
-            if niter > 10:
+            if niter > 1:
                 t0 = time.time()
                 self.tod_signalsubtracted = self.tod - self.tod_signal_sample
                 self.tod_estimate_sigma0()
@@ -443,11 +438,11 @@ class Gibbs:
                 hp.write_map(f'output/comp_{self.comp_labels[icomp]}_c{iter:06}.fits', self.comp_maps[icomp], overwrite=True, dtype=np.float64)
 
             t0 = time.time()
-            #self.sample_beta_d()
-            #self.sample_T_d()
+            self.sample_beta_d()
+            self.sample_T_d()
 
-            #hp.write_map(f'output/comp_dust_beta_c{iter:06}.fits', self.beta_d, overwrite=True, dtype=np.float64)
-            #hp.write_map(f'output/comp_dust_T_c{iter:06}.fits', self.T_d, overwrite=True, dtype=np.float64)
+            hp.write_map(f'output/comp_dust_beta_c{iter:06}.fits', self.beta_d, overwrite=True, dtype=np.float64)
+            hp.write_map(f'output/comp_dust_T_c{iter:06}.fits', self.T_d, overwrite=True, dtype=np.float64)
 
             print(f">Spectral index sampling finished in {time.time()-t0:.2f}s.")
 
@@ -500,5 +495,5 @@ if __name__ == "__main__":
     ngibbs = 250
     gibbs = Gibbs()
     #gibbs.read_tod_from_file('../src/python/preproc_scripts/tod_example_256_s1.0_b20_dust.h5', ['0030', '0100', '0217', '0857', '1200'])
-    gibbs.read_tod_from_file('../src/python/preproc_scripts/tod_example_256_s1.0_b20_dust.h5', ['0030', '0100', '0217', '0353', '0857'])
+    gibbs.read_tod_from_file(f'../src/python/preproc_scripts/tod_example_{NSIDE}_s1.0_b{fwhm_arcmin}_dust.h5', ['0030', '0100', '0217', '0353', '0857'])
     gibbs.solve(ngibbs)
