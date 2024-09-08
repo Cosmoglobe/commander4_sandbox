@@ -11,7 +11,7 @@ try:
 except FileExistsError:
     pass
 
-NSIDE   = 64
+NSIDE   = 32
 NPIX = 12*NSIDE**2
 LMAX = 3*NSIDE-1
 
@@ -39,6 +39,8 @@ for iter in tqdm.tqdm(range(1, 1000)):
     if os.path.exists(f"plots/Cl_iter{iter:06}.png"):
         continue
 
+
+    # Component maps
     m = hp.read_map(f'output/comp_dust_c{iter:06}.fits')
     hp.mollview(m, norm='log', min=75e3, max=1e9, cmap='afmhot')
     plt.savefig(f'plots/comp_dust_c{iter:06}.png')
@@ -53,6 +55,15 @@ for iter in tqdm.tqdm(range(1, 1000)):
     m = hp.read_map(f'output/comp_dust_T_c{iter:06}.fits')
     hp.mollview(m, min=17, max=23)
     plt.savefig(f'plots/comp_dust_T_c{iter:06}.png')
+
+
+    # Residual maps
+    for iband in range(5):
+        res = hp.read_map(f'output/res_band_{iband:02}_c{iter:06}.fits')
+        rms = hp.read_map(f'output/rms_band_{iband:02}_c{iter:06}.fits')
+
+        hp.mollview(res/rms, min=-3, max=3, cmap='RdBu_r')
+        plt.savefig(f'plots/res_sigma_band_{iband:02}_c{iter:06}.png')
    
 
     # CMB Constrained Realizations

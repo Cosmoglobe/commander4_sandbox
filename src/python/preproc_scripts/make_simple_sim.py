@@ -31,14 +31,14 @@ def mixmat(nu, nu_0, beta, T):
     return M
 
 
-nside = 64 #8192#256
+nside = 32 #8192#256
 lmax = 3*nside-1
 fwhm_arcmin = 20
 fwhm = fwhm_arcmin*u.arcmin
 sigma_fac = 1.0
 
-sigma0s = np.array([100, 80, 30, 100, 200])*sigma_fac*u.uK_CMB/10
-freqs = np.array([30, 100, 217, 353, 857])
+sigma0s = np.array([100, 80, 30, 100, 200])*sigma_fac*u.uK_CMB/100
+freqs = np.array([30, 100, 217, 353, 1200])
 
 
 
@@ -61,10 +61,11 @@ Cls = np.array([Cl, Cl_EE, Cl_BB, Cl_TE])
 nu_dust = 857
 
 dust = pysm3.Sky(nside=1024, preset_strings=["d1"])
-dust_857 = dust.get_emission(nu_dust*u.GHz)
-dust_857_s = pysm3.apply_smoothing_and_coord_transform(dust_857, fwhm=fwhm)
-dust_857_s = dust_857_s.to(u.MJy/u.sr, equivalencies=u.cmb_equivalencies(857*u.GHz))
-dust_857_s = hp.ud_grade(dust_857_s.value, nside)*dust_857_s.unit
+dust_maps = [dust.get_emission(f*u.GHz) for f in freqs]
+dust_s = [pysm3.apply_smoothing_and_coord_transform(d, fwhm=fwhm) for d in dust_maps]
+dust_s = [d.to(u.MJy/u.sr, equivalencies=u.cmb_equivalencies(f*u.GHz)) for d, f in zip(dust_s, freqs)]
+dust_s = [hp.ud_grade(d.value, nside)*d.unit for d in dust_s]
+
 
 
 #dust_857_s = hp.smoothing(dust_857, fwhm=fwhm.to('rad').value)*dust_857.unit
@@ -88,7 +89,7 @@ cmb_s = cmb_s * u.uK_CMB
 
 npix = 12*nside**2
 
-repeat = 50
+repeat = 500
 ntod = repeat*npix
 
 pix = np.arange(ntod) % npix
@@ -97,14 +98,13 @@ psi = np.repeat(np.arange(repeat)*np.pi/repeat, npix)
 ds = []
 for i in range(len(freqs)):
     cmb_freq = cmb_s.to(u.MJy/u.sr, equivalencies=u.cmb_equivalencies(freqs[i]*u.GHz))
-    M = mixmat(freqs[i], nu_dust, beta, T)
-    m_s = cmb_freq + dust_857_s * M
+    m_s = cmb_freq + dust_s[i]
     I,Q,U = m_s
     d = I[pix] + Q[pix]*np.cos(2*psi) + U[pix]*np.sin(2*psi)
     d = d.to(u.uK_CMB, equivalencies=u.cmb_equivalencies(freqs[i]*u.GHz))
     ds.append((d + np.random.randn(ntod)*sigma0s[i]).astype('float32').value)
 
-hp.write_map(f"true_sky_dust857_s_{nside}.fits", dust_857_s, overwrite=True)
+#hp.write_map(f"true_sky_dust857_s_{nside}.fits", dust_857_s, overwrite=True)
 
 pix = pix.astype('int32')
 
