@@ -11,7 +11,7 @@ try:
 except FileExistsError:
     pass
 
-NSIDE   = 256
+NSIDE   = 64
 NPIX = 12*NSIDE**2
 LMAX = 3*NSIDE-1
 
@@ -64,6 +64,13 @@ for iter in tqdm.tqdm(range(1, 1000)):
 
         hp.mollview(res/rms, min=-3, max=3, cmap='RdBu_r')
         plt.savefig(f'plots/res_sigma_band_{iband:02}_c{iter:06}.png')
+        hp.mollview(rms)
+        plt.savefig(f'plots/rms_band_{iband:02}_c{iter:06}.png')
+
+        m = hp.read_map(f'output/map_band_{iband:02}_c{iter:06}.fits')
+        hp.mollview(m, min=-250, max=250, cmap='RdBu_r')
+        plt.savefig(f'plots/map_band_{iband:02}_c{iter:06}.png')
+        plt.close('all')
    
 
     # CMB Constrained Realizations

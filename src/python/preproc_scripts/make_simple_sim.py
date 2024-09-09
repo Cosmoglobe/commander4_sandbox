@@ -31,7 +31,7 @@ def mixmat(nu, nu_0, beta, T):
     return M
 
 
-nside = 256 #8192#256
+nside = 64 #8192#256
 lmax = 3*nside-1
 fwhm_arcmin = 20
 fwhm = fwhm_arcmin*u.arcmin
@@ -60,23 +60,28 @@ Cls = np.array([Cl, Cl_EE, Cl_BB, Cl_TE])
 
 nu_dust = 857
 
-dust = pysm3.Sky(nside=1024, preset_strings=["d1"])
-dust_maps = [dust.get_emission(f*u.GHz) for f in freqs]
-dust_s = [pysm3.apply_smoothing_and_coord_transform(d, fwhm=fwhm) for d in dust_maps]
-dust_s = [d.to(u.MJy/u.sr, equivalencies=u.cmb_equivalencies(f*u.GHz)) for d, f in zip(dust_s, freqs)]
-dust_s = [hp.ud_grade(d.value, nside)*d.unit for d in dust_s]
+#dust = pysm3.Sky(nside=1024, preset_strings=["d1"])
+#dust_maps = [dust.get_emission(f*u.GHz) for f in freqs]
+#dust_s = [pysm3.apply_smoothing_and_coord_transform(d, fwhm=fwhm) for d in dust_maps]
+#dust_s = [d.to(u.MJy/u.sr, equivalencies=u.cmb_equivalencies(f*u.GHz)) for d, f in zip(dust_s, freqs)]
+#dust_s = [hp.ud_grade(d.value, nside)*d.unit for d in dust_s]
 
-
-
-#dust_857_s = hp.smoothing(dust_857, fwhm=fwhm.to('rad').value)*dust_857.unit
 
 beta = 1.5
 T = 20
 
+dust = pysm3.Sky(nside=1024, preset_strings=["d1"])
+dust_857 = dust.get_emission(857*u.GHz).to(u.MJy/u.sr, equivalencies=u.cmb_equivalencies(857*u.GHz))
+dust_857_s = hp.smoothing(dust_857, fwhm=fwhm.to('rad').value)*dust_857.unit
+dust_s = [dust_857_s*mixmat(f, 857, beta, T) for f in freqs]
+dust_s = [d.to(u.MJy/u.sr, equivalencies=u.cmb_equivalencies(f*u.GHz)) for d,f in zip(dust_s,freqs)]
+dust_s = [hp.ud_grade(d.value, nside)*d.unit for d in dust_s]
 
 
 
-chunk_size = 2**18
+
+
+chunk_size = 2**15
 
 np.random.seed(0)
 alms = hp.synalm(Cls, lmax=3*nside-1, new=True)
@@ -89,7 +94,7 @@ cmb_s = cmb_s * u.uK_CMB
 
 npix = 12*nside**2
 
-repeat = 20
+repeat = 50
 ntod = repeat*npix
 
 pix = np.arange(ntod) % npix

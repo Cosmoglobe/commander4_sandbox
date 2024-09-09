@@ -20,10 +20,10 @@ nthreads = 20
 # Some global variables - should be read from a parameter file.
 fwhm_arcmin = 20
 FWHM = fwhm_arcmin/60*np.pi/180*np.ones(5)
-NSIDE = 256
+NSIDE = 64
 LMAX = 3*NSIDE-1
-NTOD = 2**18
-NSCAN = 60
+NTOD = 2**15
+NSCAN = 75
 VERBOSE = False
 
 
@@ -122,8 +122,8 @@ class Gibbs:
 
         pix = np.arange(self.npix)
         lon, lat = hp.pix2ang(self.nside, pix, lonlat=True)
-        self.ipix_mask    = []
-        self.ipix_mask_cr = pix[abs(lat) < 25]
+        self.ipix_mask    = [] # pix[abs(lat) < 5]
+        self.ipix_mask_cr = [] # pix[abs(lat) < 25]
 
 
     def read_tod_from_file(self, h5_filename, bands):
@@ -406,19 +406,19 @@ class Gibbs:
             # TOD stage
             # **********************
             # Estimate white noise rms per scan
-            if iter > 1:
+            if iter > 5:
                 t0 = time.time()
                 self.tod_signalsubtracted = self.tod - self.tod_signal_sample
                 self.tod_estimate_sigma0()
                 print(f">TOD sampling finished in {time.time()-t0:.2f}s.")
             else:
                 # Fixing sigma0
-                sigma0_true = np.array([100, 80, 30, 150, 220])
+                sigma0_true = np.array([100, 80, 30, 100, 200])/100
                 for iband in range(self.nband):
                     self.sigma0_est[iband,:] = sigma0_true[iband]
 
             for iband in range(self.nband):
-                np.save(f"output/sigma0_est_band_{iband:02}_c{iter:06}.npy", self.sigma0_est)
+                np.save(f"output/sigma0_est_band_{iband:02}_c{iter:06}.npy", self.sigma0_est[iband])
 
 
 
@@ -447,8 +447,9 @@ class Gibbs:
                 hp.write_map(f'output/comp_{self.comp_labels[icomp]}_c{iter:06}.fits', self.comp_maps[icomp], overwrite=True, dtype=np.float64)
 
             t0 = time.time()
-            #self.sample_beta_d()
-            #self.sample_T_d()
+            if iter > 10:
+                self.sample_beta_d()
+                self.sample_T_d()
 
             hp.write_map(f'output/comp_dust_beta_c{iter:06}.fits', self.beta_d, overwrite=True, dtype=np.float64)
             hp.write_map(f'output/comp_dust_T_c{iter:06}.fits', self.T_d, overwrite=True, dtype=np.float64)
