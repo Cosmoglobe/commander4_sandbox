@@ -31,7 +31,7 @@ def mixmat(nu, nu_0, beta, T):
     return M
 
 
-nside = 32 #8192#256
+nside = 256 #8192#256
 lmax = 3*nside-1
 fwhm_arcmin = 20
 fwhm = fwhm_arcmin*u.arcmin
@@ -76,7 +76,7 @@ T = 20
 
 
 
-chunk_size = 2**15
+chunk_size = 2**18
 
 np.random.seed(0)
 alms = hp.synalm(Cls, lmax=3*nside-1, new=True)
@@ -89,7 +89,7 @@ cmb_s = cmb_s * u.uK_CMB
 
 npix = 12*nside**2
 
-repeat = 500
+repeat = 20
 ntod = repeat*npix
 
 pix = np.arange(ntod) % npix

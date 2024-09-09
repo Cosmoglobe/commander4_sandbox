@@ -20,10 +20,10 @@ nthreads = 20
 # Some global variables - should be read from a parameter file.
 fwhm_arcmin = 20
 FWHM = fwhm_arcmin/60*np.pi/180*np.ones(5)
-NSIDE = 32
+NSIDE = 256
 LMAX = 3*NSIDE-1
-NTOD = 2**15
-NSCAN = 187
+NTOD = 2**18
+NSCAN = 60
 VERBOSE = False
 
 
@@ -102,7 +102,8 @@ class Gibbs:
 
         self.comp_maps = np.zeros((self.ncomp, self.npix))
 
-        self.map_rms = np.zeros((self.nband, self.npix))
+        self.map_rms    = np.zeros((self.nband, self.npix))
+        self.map_rms_cr = np.zeros((self.nband, self.npix))
         self.map_inv_var = np.zeros((self.nband, self.npix))
         self.map_sky = np.zeros((self.nband, self.npix))
         self.tod_signal_sample = np.zeros((self.nband, self.nscan, self.ntod))
@@ -121,7 +122,8 @@ class Gibbs:
 
         pix = np.arange(self.npix)
         lon, lat = hp.pix2ang(self.nside, pix, lonlat=True)
-        self.ipix_mask = pix[abs(lat) < 5]
+        self.ipix_mask    = []
+        self.ipix_mask_cr = pix[abs(lat) < 25]
 
 
     def read_tod_from_file(self, h5_filename, bands):
@@ -151,7 +153,7 @@ class Gibbs:
         for iband in range(self.nband):
             Ax = hp.smoothalm(x, self.fwhm[iband], inplace=False)
             YAx = alm2map(Ax, self.nside, self.lmax)
-            NYAx = YAx.copy()/self.map_rms[iband]**2
+            NYAx = YAx.copy()/self.map_rms_cr[iband]**2
             YTNYAx = alm2map_adjoint(NYAx, self.nside, self.lmax)
             ATYTNYAx = hp.smoothalm(YTNYAx, self.fwhm[iband], inplace=False)
             LHS_sum += ATYTNYAx
@@ -166,7 +168,7 @@ class Gibbs:
         RHS_sum = np.zeros(self.alm_len, dtype=np.complex128)
         for iband in range(self.nband):
             res = self.map_sky[iband] - self.comp_maps[1]*dust_sed(self.freqs[iband], self.beta_d, self.T_d)
-            Nd = res/self.map_rms[iband]**2
+            Nd = res/self.map_rms_cr[iband]**2
             YTNd = alm2map_adjoint(Nd, self.nside, self.lmax)
             ATYTNd = hp.smoothalm(YTNd, self.fwhm[iband], inplace=False)
             RHS_sum += ATYTNd
@@ -186,7 +188,7 @@ class Gibbs:
 
         for iband in range(self.nband):
             omega1 = np.random.normal(0, 1, self.npix)
-            Nomega1 = omega1/self.map_rms[iband]
+            Nomega1 = omega1/self.map_rms_cr[iband]
             YTNomega1 = alm2map_adjoint(Nomega1, self.nside, self.lmax)
             ATYTNomega1 = hp.smoothalm(YTNomega1, self.fwhm[iband], inplace=False)
             RHS_sum += ATYTNomega1
@@ -196,8 +198,8 @@ class Gibbs:
 
         RHS_sum = np.zeros((self.ncomp, self.npix)) 
         A = np.zeros((self.ncomp, self.ncomp, self.npix))
+        M = np.zeros((self.nband, self.ncomp))
         for i in range(self.npix):
-            M = np.zeros((self.nband, self.ncomp))
             M[:,0] = cmb_sed(self.freqs)
             M[:,1] = dust_sed(self.freqs, self.beta_d[i], self.T_d[i])
             x = M.T.dot((1/self.map_rms[:,i]**2*self.map_sky[:,i]))
@@ -352,7 +354,9 @@ class Gibbs:
         for iband in range(self.nband):
             maplib.mapmaker(self.map_sky[iband], self.map_inv_var[iband], self.tod[iband], self.pix[iband], self.sigma0_est[iband], self.ntod, self.nscan, self.npix)
         self.map_rms = 1.0/np.sqrt(self.map_inv_var)
-        self.map_rms[:,self.ipix_mask] = np.inf
+        self.map_rms_cr = 1.0/np.sqrt(self.map_inv_var)
+        self.map_rms[:,self.ipix_mask]       = np.inf
+        self.map_rms_cr[:,self.ipix_mask_cr] = np.inf
 
     def tod_mapmaker_IQU(self):
         self.map_IQU[:] = 0.
@@ -443,8 +447,8 @@ class Gibbs:
                 hp.write_map(f'output/comp_{self.comp_labels[icomp]}_c{iter:06}.fits', self.comp_maps[icomp], overwrite=True, dtype=np.float64)
 
             t0 = time.time()
-            self.sample_beta_d()
-            self.sample_T_d()
+            #self.sample_beta_d()
+            #self.sample_T_d()
 
             hp.write_map(f'output/comp_dust_beta_c{iter:06}.fits', self.beta_d, overwrite=True, dtype=np.float64)
             hp.write_map(f'output/comp_dust_T_c{iter:06}.fits', self.T_d, overwrite=True, dtype=np.float64)
@@ -454,7 +458,7 @@ class Gibbs:
 
             for iband in range(self.nband):
                 res = self.map_sky[iband] - self.comp_maps[0] - self.comp_maps[1]*dust_sed(self.freqs[iband], self.beta_d, self.T_d) 
-                hp.write_map(f'output/res_band_{iband:02}_c{iter:06}.fits', res, dtype=np.float64)
+                hp.write_map(f'output/res_band_{iband:02}_c{iter:06}.fits', res, dtype=np.float64, overwrite=True)
 
             # **********************
             # CMB Constrained Realizations
