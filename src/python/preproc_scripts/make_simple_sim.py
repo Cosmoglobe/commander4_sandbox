@@ -24,10 +24,14 @@ from camb import model, initialpower
 from astropy.modeling.physical_models import BlackBody
 
 
-def mixmat(nu, nu_0, beta, T):
+def mixmat_d(nu, nu_0, beta, T):
     bb = BlackBody(temperature=T*u.K)
     M = (nu/nu_0)**beta
     M *= bb(nu*u.GHz)/bb(nu_0*u.GHz)
+    return M
+
+def mixmat_s(nu, nu_0, beta):
+    M = (nu/nu_0)**beta
     return M
 
 
@@ -35,10 +39,10 @@ nside = 64 #8192#256
 lmax = 3*nside-1
 fwhm_arcmin = 20
 fwhm = fwhm_arcmin*u.arcmin
-sigma_fac = 1.0
+sigma_fac = 1e-2
 
-sigma0s = np.array([100, 80, 30, 100, 200])*sigma_fac*u.uK_CMB/100
-freqs = np.array([30, 100, 217, 353, 1200])
+sigma0s = np.array([100, 80, 30, 100, 200])*sigma_fac*u.uK_CMB
+freqs = np.array([30, 100, 353, 545, 857])
 
 
 
@@ -70,15 +74,23 @@ nu_dust = 857
 beta = 1.5
 T = 20
 
+beta_s = -3
+
 dust = pysm3.Sky(nside=1024, preset_strings=["d1"])
 dust_857 = dust.get_emission(857*u.GHz).to(u.MJy/u.sr, equivalencies=u.cmb_equivalencies(857*u.GHz))
 dust_857_s = hp.smoothing(dust_857, fwhm=fwhm.to('rad').value)*dust_857.unit
-dust_s = [dust_857_s*mixmat(f, 857, beta, T) for f in freqs]
+dust_s = [dust_857_s*mixmat_d(f, 857, beta, T) for f in freqs]
 dust_s = [d.to(u.MJy/u.sr, equivalencies=u.cmb_equivalencies(f*u.GHz)) for d,f in zip(dust_s,freqs)]
 dust_s = [hp.ud_grade(d.value, nside)*d.unit for d in dust_s]
 
 
 
+sync = pysm3.Sky(nside=1024, preset_strings=["d1"])
+sync_23 = sync.get_emission(23*u.GHz).to(u.MJy/u.sr, equivalencies=u.cmb_equivalencies(23*u.GHz))
+sync_23_s = hp.smoothing(sync_23, fwhm=fwhm.to('rad').value)*sync_23.unit
+sync_s = [sync_23_s*mixmat_s(f, 23, beta_s) for f in freqs]
+sync_s = [d.to(u.MJy/u.sr, equivalencies=u.cmb_equivalencies(f*u.GHz)) for d,f in zip(sync_s,freqs)]
+sync_s = [hp.ud_grade(d.value, nside)*d.unit for d in sync_s]
 
 
 chunk_size = 2**15
@@ -103,7 +115,7 @@ psi = np.repeat(np.arange(repeat)*np.pi/repeat, npix)
 ds = []
 for i in range(len(freqs)):
     cmb_freq = cmb_s.to(u.MJy/u.sr, equivalencies=u.cmb_equivalencies(freqs[i]*u.GHz))
-    m_s = cmb_freq + dust_s[i]
+    m_s = cmb_freq + dust_s[i] + sync_s[i]
     I,Q,U = m_s
     d = I[pix] + Q[pix]*np.cos(2*psi) + U[pix]*np.sin(2*psi)
     d = d.to(u.uK_CMB, equivalencies=u.cmb_equivalencies(freqs[i]*u.GHz))

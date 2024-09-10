@@ -6,7 +6,7 @@ A = (2*c.h*u.GHz**3/c.c**2).to('MJy').value
 h_over_k = (c.h/c.k_B/(1*u.K)).to('GHz-1').value
 h_over_kTCMB = (c.h/c.k_B/(2.7255*u.K)).to('GHz-1').value
 def blackbody(nu, T):
-    return nu**3/np.expm1(nu*h_over_k/T)
+    return A*nu**3/np.expm1(nu*h_over_k/T)
 
 def g(nu):
     # From uK_CMB to MJy/sr
@@ -22,6 +22,9 @@ def dust_sed(nu, beta, T, nu0 = 857):
     x = nu*h_over_k/T
     return g(nu)/g(nu0) * (nu/nu0)**beta * blackbody(nu, T)/blackbody(nu0, T)
 
+def sync_sed(nu, beta, nu0 = 23):
+    # Modified blackbody, in uK_CMB
+    return g(nu)/g(nu0) * (nu/nu0)**beta
 
 def lnlike_beta_d(beta_d, args):
     '''

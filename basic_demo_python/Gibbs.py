@@ -8,7 +8,7 @@ import ctypes as ct
 from scipy.sparse.linalg import cg, LinearOperator
 import os
 import matplotlib.pyplot as plt
-from foregrounds import cmb_sed, dust_sed, lnlike_beta_d, lnlike_T_d
+from foregrounds import cmb_sed, dust_sed, sync_sed, lnlike_beta_d, lnlike_T_d
 
 from tqdm import tqdm
 current_dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -25,6 +25,7 @@ LMAX = 3*NSIDE-1
 NTOD = 2**15
 NSCAN = 75
 VERBOSE = False
+factor = 0.01
 
 
 def dot_alm(alm1, alm2):
@@ -93,12 +94,15 @@ class Gibbs:
         self.nband = 5
         self.fwhm = FWHM[:self.nband]
 
-        self.ncomp = 2
-        self.freqs = np.array([30,100,217,353,1200])
-        self.comp_labels = ['cmb', 'dust']
+        self.ncomp = 3
+        #self.freqs = np.array([30,100,217,353,1200])
+        self.freqs = np.array([30, 100, 353, 545, 857])
+        #self.freqs = np.array([30,100,217,353,857])
+        self.comp_labels = ['cmb', 'dust', 'sync']
 
         self.T_d = 20*np.ones(self.npix)
         self.beta_d = 1.5*np.ones(self.npix)
+        self.beta_s = -3*np.ones(self.npix)
 
         self.comp_maps = np.zeros((self.ncomp, self.npix))
 
@@ -122,8 +126,8 @@ class Gibbs:
 
         pix = np.arange(self.npix)
         lon, lat = hp.pix2ang(self.nside, pix, lonlat=True)
-        self.ipix_mask    = [] # pix[abs(lat) < 5]
-        self.ipix_mask_cr = [] # pix[abs(lat) < 25]
+        self.ipix_mask    =  [] # pix[abs(lat) < 5]
+        self.ipix_mask_cr = hp.query_disc(self.nside, (10,0,0), np.radians(20))  # Quick way of simulating a "mask", aka a region of infinite rms.
 
 
     def read_tod_from_file(self, h5_filename, bands):
@@ -167,7 +171,7 @@ class Gibbs:
         """
         RHS_sum = np.zeros(self.alm_len, dtype=np.complex128)
         for iband in range(self.nband):
-            res = self.map_sky[iband] - self.comp_maps[1]*dust_sed(self.freqs[iband], self.beta_d, self.T_d)
+            res = self.map_sky[iband] - self.comp_maps[1]*dust_sed(self.freqs[iband], self.beta_d, self.T_d) - self.comp_maps[2]*sync_sed(self.freqs[iband], self.beta_s)
             Nd = res/self.map_rms_cr[iband]**2
             YTNd = alm2map_adjoint(Nd, self.nside, self.lmax)
             ATYTNd = hp.smoothalm(YTNd, self.fwhm[iband], inplace=False)
@@ -202,6 +206,7 @@ class Gibbs:
         for i in range(self.npix):
             M[:,0] = cmb_sed(self.freqs)
             M[:,1] = dust_sed(self.freqs, self.beta_d[i], self.T_d[i])
+            M[:,2] = sync_sed(self.freqs, self.beta_s[i])
             x = M.T.dot((1/self.map_rms[:,i]**2*self.map_sky[:,i]))
             x += M.T.dot(np.random.randn(self.nband)/self.map_rms[:,i])
             A = (M.T.dot(np.diag(1/self.map_rms[:,i]**2)).dot(M))
@@ -255,7 +260,7 @@ class Gibbs:
             maxiter = 21
         else:
             maxiter = 101
-        maxiter = 251
+        maxiter = 1001
         iter = 0
         while CG_solver.err > err_tol:
             CG_solver.step()
@@ -372,6 +377,11 @@ class Gibbs:
         self.rms_IQU[:,:3,:] = np.sqrt(self.map_inv_var_IQU[:,:3,:])
         self.rms_IQU[:,3:,:] = self.map_inv_var_IQU[:,3:,:]
         self.rms_IQU[:,:,self.ipix_mask] = np.inf
+        self.map_sky[:,:] = self.map_IQU[:,0,:]
+        self.map_rms[:,:] = self.rms_IQU[:,0,:]
+        self.map_rms[:,self.ipix_mask] = np.inf
+        self.map_rms_cr[:,:] = self.rms_IQU[:,0,:]
+        self.map_rms_cr[:,self.ipix_mask_cr] = np.inf
 
 
     def map2tod(self):
@@ -406,14 +416,16 @@ class Gibbs:
             # TOD stage
             # **********************
             # Estimate white noise rms per scan
-            if iter > 5:
-                t0 = time.time()
-                self.tod_signalsubtracted = self.tod - self.tod_signal_sample
-                self.tod_estimate_sigma0()
+            t0 = time.time()
+            self.tod_signalsubtracted = self.tod - self.tod_signal_sample
+            if iter > 10:
+                #plt.plot((self.tod_signalsubtracted[4,50,1:] - self.tod_signalsubtracted[4,50,:-1])/28*0.5)
+                #plt.show()
+                #self.tod_estimate_sigma0()
                 print(f">TOD sampling finished in {time.time()-t0:.2f}s.")
             else:
                 # Fixing sigma0
-                sigma0_true = np.array([100, 80, 30, 100, 200])/100
+                sigma0_true = np.array([100, 80, 30, 100, 200])*factor
                 for iband in range(self.nband):
                     self.sigma0_est[iband,:] = sigma0_true[iband]
 
@@ -427,7 +439,7 @@ class Gibbs:
             # **********************
             # Make frequency maps
             t0 = time.time()
-            self.tod_mapmaker()
+            self.tod_mapmaker_IQU()
             print(f">Mapmaker finished in {time.time()-t0:.2f}s.")
             # Write maps to file.
             for iband in range(self.nband):
@@ -447,7 +459,7 @@ class Gibbs:
                 hp.write_map(f'output/comp_{self.comp_labels[icomp]}_c{iter:06}.fits', self.comp_maps[icomp], overwrite=True, dtype=np.float64)
 
             t0 = time.time()
-            if iter > 10:
+            if iter > 100:
                 self.sample_beta_d()
                 self.sample_T_d()
 
@@ -458,7 +470,7 @@ class Gibbs:
 
 
             for iband in range(self.nband):
-                res = self.map_sky[iband] - self.comp_maps[0] - self.comp_maps[1]*dust_sed(self.freqs[iband], self.beta_d, self.T_d) 
+                res = self.map_sky[iband] - self.comp_maps[0] - self.comp_maps[1]*dust_sed(self.freqs[iband], self.beta_d, self.T_d) - self.comp_maps[2]*sync_sed(self.freqs[iband], self.beta_s)
                 hp.write_map(f'output/res_band_{iband:02}_c{iter:06}.fits', res, dtype=np.float64, overwrite=True)
 
             # **********************
@@ -507,5 +519,5 @@ if __name__ == "__main__":
     ngibbs = 250
     gibbs = Gibbs()
     #gibbs.read_tod_from_file('../src/python/preproc_scripts/tod_example_256_s1.0_b20_dust.h5', ['0030', '0100', '0217', '0857', '1200'])
-    gibbs.read_tod_from_file(f'../src/python/preproc_scripts/tod_example_{NSIDE}_s1.0_b{fwhm_arcmin}_dust.h5', ['0030', '0100', '0217', '0353', '1200'])
+    gibbs.read_tod_from_file(f'../src/python/preproc_scripts/tod_example_{NSIDE}_s{factor}_b{fwhm_arcmin}_dust.h5', ['0030', '0100', '0353', '0545', '0857'])
     gibbs.solve(ngibbs)
