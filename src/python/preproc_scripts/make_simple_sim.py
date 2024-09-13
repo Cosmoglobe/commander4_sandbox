@@ -39,7 +39,7 @@ nside = 64 #8192#256
 lmax = 3*nside-1
 fwhm_arcmin = 20
 fwhm = fwhm_arcmin*u.arcmin
-sigma_fac = 1e-2
+sigma_fac = 1.0
 
 sigma0s = np.array([100, 80, 30, 100, 200])*sigma_fac*u.uK_CMB
 freqs = np.array([30, 100, 353, 545, 857])
