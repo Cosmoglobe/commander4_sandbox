@@ -93,7 +93,9 @@ sync_s = [d.to(u.MJy/u.sr, equivalencies=u.cmb_equivalencies(f*u.GHz)) for d,f i
 sync_s = [hp.ud_grade(d.value, nside)*d.unit for d in sync_s]
 
 
-chunk_size = 2**15
+npix = 12*nside**2
+
+chunk_size = npix//40
 
 np.random.seed(0)
 alms = hp.synalm(Cls, lmax=3*nside-1, new=True)
@@ -104,7 +106,6 @@ cmb_s = hp.smoothing(cmb, fwhm=fwhm.to('rad').value)
 
 cmb_s = cmb_s * u.uK_CMB
 
-npix = 12*nside**2
 
 repeat = 50
 ntod = repeat*npix
